@@ -12,6 +12,17 @@ import { Organization } from '../../organization/entities/organization.entity';
 import { Room } from '../../room/entities/room.entity';
 import { User } from '../../user/entities/user.entity';
 
+export enum BookingStatus {
+  PENDING = 'pending',
+  CONFIRMED = 'confirmed',
+  CANCELLED = 'cancelled',
+  REJECTED = 'rejected',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  NO_SHOW = 'no_show',
+  ENDED_EARLY = 'ended_early',
+}
+
 @Entity('bookings')
 export class Booking {
   @PrimaryGeneratedColumn('uuid')
@@ -53,10 +64,10 @@ export class Booking {
   @Column({
     type: 'varchar',
     length: 20,
-    comment:
-      "'pending'|'confirmed'|'cancelled'|'rejected'|'in_progress'|'completed'|'no_show'|'ended_early'",
+    enum: BookingStatus,
+    default: BookingStatus.PENDING,
   })
-  status: string;
+  status: BookingStatus;
 
   @Column({ name: 'series_id', type: 'uuid', nullable: true })
   seriesId: string;
@@ -96,15 +107,28 @@ export class Booking {
   @Column({ name: 'reminded_at', type: 'timestamptz', nullable: true })
   remindedAt: Date;
 
-  @Column({ name: 'google_event_id', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'google_event_id',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   googleEventId: string;
 
   @VersionColumn()
   version: number;
 
-  @CreateDateColumn({ name: 'created_at', type: 'timestamptz', default: () => 'now()' })
+  @CreateDateColumn({
+    name: 'created_at',
+    type: 'timestamptz',
+    default: () => 'now()',
+  })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz', default: () => 'now()' })
+  @UpdateDateColumn({
+    name: 'updated_at',
+    type: 'timestamptz',
+    default: () => 'now()',
+  })
   updatedAt: Date;
 }

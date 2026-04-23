@@ -8,7 +8,7 @@ import {
   DeleteDateColumn,
 } from 'typeorm';
 import { UserIdentity } from './user_identity.entity';
-import { RefreshToken } from 'src/modules/auth/entities/auth.entity';
+import { RefreshToken } from '../../auth/entities/auth.entity';
 
 export enum Role {
   USER = 'user',
@@ -29,7 +29,7 @@ export class User {
   @Column({ name: 'password' })
   password: string;
 
-  @Column({ name: 'avatar_url' })
+  @Column({ name: 'avatar_url', nullable: true })
   avatarUrl: string;
 
   @Column({ name: 'timezone', default: 'Asia/Ho_Chi_Minh' })
