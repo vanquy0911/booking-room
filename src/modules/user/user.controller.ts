@@ -8,7 +8,7 @@ import {
   Delete,
   UseGuards,
   Req,
-  ForbiddenException
+  ForbiddenException,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { AuthGuard } from '@nestjs/passport';
@@ -17,7 +17,7 @@ import { Role } from './entities/user.entity';
 
 @Controller('user')
 export class UserController {
-  constructor(private readonly userService: UserService) { }
+  constructor(private readonly userService: UserService) {}
 
   // @Post()
   // create(@Body() createUserDto: CreateUserDto) {
@@ -29,7 +29,9 @@ export class UserController {
   @UseGuards(AuthGuard('jwt'))
   async findAll(@Req() req) {
     if (req.user.role !== Role.ADMIN) {
-      throw new ForbiddenException("You do not have permission to access this resource");
+      throw new ForbiddenException(
+        'You do not have permission to access this resource',
+      );
     }
     return this.userService.findAll();
   }

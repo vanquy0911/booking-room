@@ -11,10 +11,13 @@ import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UserService {
-  constructor(@InjectRepository(User) private usersService: Repository<User>) { }
+  constructor(@InjectRepository(User) private usersService: Repository<User>) {}
 
   async findOneByEmail(email: string): Promise<User | null> {
-    return this.usersService.findOne({ where: { email } });
+    return this.usersService.findOne({
+      where: { email },
+      select: ['id', 'email', 'password', 'fullName', 'avatarUrl', 'role'],
+    });
   }
 
   async create(user: Partial<User>): Promise<User> {
@@ -49,14 +52,31 @@ export class UserService {
   }
 
   async updateProfile(userId: string, updateProfileDto: UpdateProfileDto) {
-    const user = await this.usersService.findOne({ where: { id: userId } });
+    const user = await this.usersService.findOne({
+      where: { id: userId },
+      select: [
+        'id',
+        'email',
+        'password',
+        'fullName',
+        'avatarUrl',
+        'role',
+        'timezone',
+        'locale',
+      ],
+    });
+
     if (!user) {
       throw new NotFoundException('User not found');
     }
     const { oldPassword, newPassword, ...otherData } = updateProfileDto;
     if (oldPassword && newPassword) {
       const isPasswordMatch = await bcrypt.compare(oldPassword, user.password);
-
+      console.log({
+        oldPassword,
+        dbPassword: user.password,
+        isPasswordMatch,
+      });
       if (!isPasswordMatch) {
         throw new BadRequestException('Old password is not correct');
       }

@@ -14,7 +14,7 @@ export class AuthService {
   constructor(
     private readonly usersService: UserService,
     private readonly jwtService: JwtService,
-  ) { }
+  ) {}
 
   async register(body: RegisterDto) {
     const existingUser = await this.usersService.findOneByEmail(body.email);

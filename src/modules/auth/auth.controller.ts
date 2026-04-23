@@ -21,7 +21,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly userService: UserService,
-  ) { }
+  ) {}
 
   @Post('register')
   register(@Body() registerDto: RegisterDto) {
