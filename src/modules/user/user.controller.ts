@@ -14,10 +14,11 @@ import { UserService } from './user.service';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from './entities/user.entity';
+import { User } from 'src/commons/decorators/user.decorator';
 
 @Controller('user')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(private readonly userService: UserService) { }
 
   // @Post()
   // create(@Body() createUserDto: CreateUserDto) {
@@ -27,8 +28,8 @@ export class UserController {
   @Get()
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
-  async findAll(@Req() req) {
-    if (req.user.role !== Role.ADMIN) {
+  async findAll(@User() user: any) {
+    if (user.role !== Role.ADMIN) {
       throw new ForbiddenException(
         'You do not have permission to access this resource',
       );

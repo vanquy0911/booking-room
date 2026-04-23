@@ -14,6 +14,7 @@ import { LoginDto } from './dto/login.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { UserService } from '../user/user.service';
 import { UpdateProfileDto } from '../user/dto/update-profile.dto';
+import { User } from 'src/commons/decorators/user.decorator';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -21,7 +22,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly userService: UserService,
-  ) {}
+  ) { }
 
   @Post('register')
   register(@Body() registerDto: RegisterDto) {
@@ -36,9 +37,8 @@ export class AuthController {
   @Get('profile')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
-  async getProfile(@Req() req) {
-    console.log(req.user);
-    const fulluser = await this.userService.findOne(req.user.id);
+  async getProfile(@User() user: any) {
+    const fulluser = await this.userService.findOne(user.id);
     if (fulluser) {
       const { password, ...result } = fulluser;
       return result;

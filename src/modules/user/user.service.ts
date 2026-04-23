@@ -11,7 +11,7 @@ import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UserService {
-  constructor(@InjectRepository(User) private usersService: Repository<User>) {}
+  constructor(@InjectRepository(User) private usersService: Repository<User>) { }
 
   async findOneByEmail(email: string): Promise<User | null> {
     return this.usersService.findOne({

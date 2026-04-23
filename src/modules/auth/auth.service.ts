@@ -14,7 +14,7 @@ export class AuthService {
   constructor(
     private readonly usersService: UserService,
     private readonly jwtService: JwtService,
-  ) {}
+  ) { }
 
   async register(body: RegisterDto) {
     const existingUser = await this.usersService.findOneByEmail(body.email);
@@ -43,6 +43,7 @@ export class AuthService {
   async login(body: LoginDto) {
     const user = await this.usersService.findOneByEmail(body.email);
     if (!user) {
+      console.log('❌ Không tìm thấy User với email:', body.email); // Thêm log này
       throw new UnauthorizedException('Invalid email or password');
     }
 
