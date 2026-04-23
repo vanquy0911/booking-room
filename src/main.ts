@@ -11,6 +11,7 @@ async function bootstrap() {
     .setDescription('Booking Room API')
     .setVersion('1.0')
     .addTag('booking-room')
+    .addBearerAuth() // Kích hoạt nút Authorize trên Swagger
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
