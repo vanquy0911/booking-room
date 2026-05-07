@@ -15,31 +15,31 @@ import { UpdateLocationDto } from './dto/update-location.dto';
 export class LocationController {
   constructor(private readonly locationService: LocationService) {}
 
-  @Post()
-  create(@Body() createLocationDto: CreateLocationDto) {
-    return this.locationService.create(createLocationDto);
-  }
+  // @Post()
+  // create(@Body() createLocationDto: CreateLocationDto) {
+  //   return this.locationService.create(createLocationDto);
+  // }
 
-  @Get()
-  findAll() {
-    return this.locationService.findAll();
-  }
+  // @Get()
+  // findAll() {
+  //   return this.locationService.findAll();
+  // }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.locationService.findOne(+id);
-  }
+  // @Get(':id')
+  // findOne(@Param('id') id: string) {
+  //   return this.locationService.findOne(+id);
+  // }
 
-  @Patch(':id')
-  update(
-    @Param('id') id: string,
-    @Body() updateLocationDto: UpdateLocationDto,
-  ) {
-    return this.locationService.update(+id, updateLocationDto);
-  }
+  // @Patch(':id')
+  // update(
+  //   @Param('id') id: string,
+  //   @Body() updateLocationDto: UpdateLocationDto,
+  // ) {
+  //   return this.locationService.update(+id, updateLocationDto);
+  // }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.locationService.remove(+id);
-  }
+  // @Delete(':id')
+  // remove(@Param('id') id: string) {
+  //   return this.locationService.remove(+id);
+  // }
 }

@@ -15,28 +15,28 @@ import { UpdateAmenityDto } from './dto/update-amenity.dto';
 export class AmenityController {
   constructor(private readonly amenityService: AmenityService) {}
 
-  @Post()
-  create(@Body() createAmenityDto: CreateAmenityDto) {
-    return this.amenityService.create(createAmenityDto);
-  }
+  // @Post()
+  // create(@Body() createAmenityDto: CreateAmenityDto) {
+  //   return this.amenityService.create(createAmenityDto);
+  // }
 
-  @Get()
-  findAll() {
-    return this.amenityService.findAll();
-  }
+  // @Get()
+  // findAll() {
+  //   return this.amenityService.findAll();
+  // }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.amenityService.findOne(+id);
-  }
+  // @Get(':id')
+  // findOne(@Param('id') id: string) {
+  //   return this.amenityService.findOne(+id);
+  // }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateAmenityDto: UpdateAmenityDto) {
-    return this.amenityService.update(+id, updateAmenityDto);
-  }
+  // @Patch(':id')
+  // update(@Param('id') id: string, @Body() updateAmenityDto: UpdateAmenityDto) {
+  //   return this.amenityService.update(+id, updateAmenityDto);
+  // }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.amenityService.remove(+id);
-  }
+  // @Delete(':id')
+  // remove(@Param('id') id: string) {
+  //   return this.amenityService.remove(+id);
+  // }
 }

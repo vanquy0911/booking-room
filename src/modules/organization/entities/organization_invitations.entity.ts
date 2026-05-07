@@ -20,7 +20,7 @@ export class OrganizationInvitation {
   @Column({ type: 'citext' })
   email: string;
 
-  @Column({ type: 'varchar', length: 20 })
+  @Column({ type: 'varchar', length: 20, default: 'member' })
   role: string;
 
   @Column({ name: 'token_hash', type: 'varchar', length: 64, unique: true })

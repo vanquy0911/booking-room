@@ -27,20 +27,20 @@ export class RefreshToken {
   tokenHash: string;
 
   @Column({ name: 'device_info', type: 'varchar', length: 255, nullable: true })
-  deviceInfo: string;
+  deviceInfo: string | null;
 
   @Column({ name: 'ip_address', type: 'inet', nullable: true })
-  ipAddress: string;
+  ipAddress: string | null;
 
   @Column({ name: 'expires_at', type: 'timestamptz' })
   expiresAt: Date;
 
   @Column({ name: 'revoked_at', type: 'timestamptz', nullable: true })
-  revokedAt: Date;
+  revokedAt: Date | null;
 
   // rotation chain
   @Column({ name: 'replaced_by', type: 'uuid', nullable: true })
-  replacedBy: string;
+  replacedBy: string | null;
 
   @Column({ name: 'created_at', type: 'timestamptz', default: () => 'now()' })
   createdAt: Date;
