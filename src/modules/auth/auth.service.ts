@@ -23,7 +23,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     @InjectRepository(RefreshToken)
     private readonly refreshTokenRepository: Repository<RefreshToken>,
-  ) {}
+  ) { }
 
   async register(body: RegisterDto) {
     const existingUser = await this.usersService.findOneByEmail(body.email);

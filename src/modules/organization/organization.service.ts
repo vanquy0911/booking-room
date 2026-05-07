@@ -91,26 +91,6 @@ export class OrganizationService {
       });
       await queryRunner.manager.save(adminMember);
 
-      // tạo Location
-      const defaultLocation = queryRunner.manager.create(Location, {
-        name: 'default',
-        slug: 'default',
-        timezone: userTimezone,
-        organizationId: savedorg.id,
-      });
-
-      const savedDefaultLocation =
-        await queryRunner.manager.save(defaultLocation);
-
-      // tạo Floor
-      const defaultFloor = queryRunner.manager.create(Floor, {
-        name: 'Ground',
-        floorNumber: 0,
-        locationId: savedDefaultLocation.id,
-      });
-
-      await queryRunner.manager.save(defaultFloor);
-
       await queryRunner.commitTransaction();
       return savedorg;
     } catch (error) {
@@ -283,5 +263,69 @@ export class OrganizationService {
         timezone: member.user.timezone,
       } : null
     }));
+  }
+
+  //hàm update tổ chức
+  async update(orgId: string, updateDto: UpdateOrganizationDto, userId: string) {
+    const isAdmin = await this.organizationMemberRepository.findOne({
+      where: { organizationId: orgId, userId, role: 'admin' },
+    });
+
+    if (!isAdmin) {
+      throw new ForbiddenException('Bạn không có quyền chỉnh sửa tổ chức này');
+    }
+
+    const org = await this.organizationRepository.findOne({ where: { id: orgId } });
+    if (!org) {
+      throw new BadRequestException('Không tìm thấy tổ chức');
+    }
+    // đổi tên slug
+    if (updateDto.name && updateDto.name !== org.name) {
+      let slug = updateDto.name
+        .toLowerCase()
+        .trim()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^\w\s-]/g, '')
+        .replace(/[\s_-]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+      const existingSlug = await this.organizationRepository.findOne({
+        where: { slug },
+      });
+
+      if (existingSlug && existingSlug.id !== orgId) {
+        slug = `${slug}-${Math.floor(Math.random() * 1000)}`;
+      }
+      org.slug = slug;
+      org.name = updateDto.name;
+    }
+
+    if (updateDto.plan) org.plan = updateDto.plan;
+    if (updateDto.workingHoursStart) org.workingHoursStart = updateDto.workingHoursStart;
+    if (updateDto.workingHoursEnd) org.workingHoursEnd = updateDto.workingHoursEnd;
+    if (updateDto.workingDays) org.workingDays = updateDto.workingDays;
+
+    return this.organizationRepository.save(org);
+  }
+
+  //hàm xóa
+  async remove(orgId: string, userId: string) {
+    const isAdmin = await this.organizationMemberRepository.findOne({
+      where: { organizationId: orgId, userId, role: 'admin' },
+    });
+
+    if (!isAdmin) {
+      throw new ForbiddenException('Bạn không có quyền xóa tổ chức này');
+    }
+
+    const org = await this.organizationRepository.findOne({ where: { id: orgId } });
+    if (!org) {
+      throw new BadRequestException('Không tìm thấy tổ chức');
+    }
+
+    await this.organizationRepository.softRemove(org);
+
+    return { message: 'Xóa tổ chức thành công' };
   }
 }

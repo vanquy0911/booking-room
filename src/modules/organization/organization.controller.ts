@@ -44,6 +44,29 @@ export class OrganizationController {
     return this.organizationService.inviteMember(orgId, inviteDto, userId);
   }
 
+  @Patch(':orgId')
+  @ApiOperation({ summary: 'Update organization' })
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'))
+  update(
+    @Param('orgId') orgId: string,
+    @Body() updateDto: UpdateOrganizationDto,
+    @User('id') userId: string,
+  ) {
+    return this.organizationService.update(orgId, updateDto, userId);
+  }
+
+  @Delete(':orgId')
+  @ApiOperation({ summary: 'Delete organization' })
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'))
+  remove(
+    @Param('orgId') orgId: string,
+    @User('id') userId: string,
+  ) {
+    return this.organizationService.remove(orgId, userId);
+  }
+
   @Get()
   @ApiOperation({ summary: 'Get organization by user id' })
   @ApiBearerAuth()
