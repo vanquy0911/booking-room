@@ -5,6 +5,7 @@ import {
   Put,
   Get,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
@@ -16,6 +17,7 @@ import { UserService } from '../user/user.service';
 import { UpdateProfileDto } from '../user/dto/update-profile.dto';
 import { User } from 'src/commons/decorators/user.decorator';
 import { Public } from 'src/commons/decorators/public.decorator';
+import type { Request, Response } from 'express';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -23,7 +25,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly userService: UserService,
-  ) { }
+  ) {}
 
   @Public()
   @Post('register')
@@ -33,8 +35,17 @@ export class AuthController {
 
   @Public()
   @Post('login')
-  login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Body() loginDto: LoginDto,
+  ) {
+    const result = await this.authService.login(loginDto, {
+      ipAddress: req.ip,
+      deviceInfo: req.headers['user-agent'],
+    });
+    res.setHeader('x-refresh-token', result.refresh_token);
+    return result;
   }
 
   @Get('profile')
