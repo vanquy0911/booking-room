@@ -24,6 +24,7 @@ export class OrganizationMember {
     type: 'varchar',
     length: 20,
     comment: "'admin'|'manager'|'member'",
+    default: 'member',
   })
   role: string;
 

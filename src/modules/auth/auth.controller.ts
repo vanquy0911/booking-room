@@ -7,7 +7,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -15,6 +15,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { UserService } from '../user/user.service';
 import { UpdateProfileDto } from '../user/dto/update-profile.dto';
 import { User } from 'src/commons/decorators/user.decorator';
+import { Public } from 'src/commons/decorators/public.decorator';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -24,11 +25,13 @@ export class AuthController {
     private readonly userService: UserService,
   ) { }
 
+  @Public()
   @Post('register')
   register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }
 
+  @Public()
   @Post('login')
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);

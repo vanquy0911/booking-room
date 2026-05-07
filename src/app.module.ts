@@ -1,4 +1,9 @@
-import { Module } from '@nestjs/common';
+import {
+  MiddlewareConsumer,
+  Module,
+  NestModule,
+  RequestMethod,
+} from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UserModule } from './modules/user/user.module';
@@ -10,8 +15,12 @@ import { OrganizationModule } from './modules/organization/organization.module';
 import { LocationModule } from './modules/location/location.module';
 import { AmenityModule } from './modules/amenity/amenity.module';
 import { NotificationModule } from './modules/notification/notification.module';
-
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { User } from './modules/user/entities/user.entity';
+import { RefreshToken } from './modules/auth/entities/auth.entity';
+import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from './commons/guard/JwtAuthGuard.guard';
+import { AuthMiddleware } from './commons/middlewares/auth.middleware';
 
 @Module({
   imports: [
@@ -38,6 +47,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
       }),
     }),
 
+    // Đăng ký Entity cho Middleware dùng
+    TypeOrmModule.forFeature([User, RefreshToken]),
+
     UserModule,
     BookingModule,
     RoomModule,
@@ -48,6 +60,18 @@ import { TypeOrmModule } from '@nestjs/typeorm';
     NotificationModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard
+    },
+  ],
 })
-export class AppModule { }
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(AuthMiddleware) // Chạy trước để "sửa lỗi" token nếu cần
+      .forRoutes('*');
+  }
+}
+

@@ -28,10 +28,20 @@ export class Organization {
   @Column({ name: 'default_timezone', type: 'varchar', length: 50 })
   defaultTimezone: string;
 
-  @Column({ name: 'working_hours_start', type: 'time', default: '08:00' })
+  @Column({
+    name: 'working_hours_start',
+    type: 'time',
+    default: '08:00',
+    nullable: true,
+  })
   workingHoursStart: string;
 
-  @Column({ name: 'working_hours_end', type: 'time', default: '18:00' })
+  @Column({
+    name: 'working_hours_end',
+    type: 'time',
+    default: '18:00',
+    nullable: true,
+  })
   workingHoursEnd: string;
 
   @Column({
@@ -42,10 +52,15 @@ export class Organization {
   })
   workingDays: number[];
 
-  @Column({ name: 'no_show_minutes', type: 'int', default: 15 })
+  @Column({ name: 'no_show_minutes', type: 'int', default: 15, nullable: true })
   noShowMinutes: number;
 
-  @Column({ name: 'auto_reject_pending_hours', type: 'int', default: 24 })
+  @Column({
+    name: 'auto_reject_pending_hours',
+    type: 'int',
+    default: 24,
+    nullable: true,
+  })
   autoRejectPendingHours: number;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })

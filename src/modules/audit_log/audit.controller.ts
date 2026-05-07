@@ -15,28 +15,28 @@ import { UpdateAuditDto } from './dto/update-audit.dto';
 export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 
-  @Post()
-  create(@Body() createAuditDto: CreateAuditDto) {
-    return this.auditService.create(createAuditDto);
-  }
+  // @Post()
+  // create(@Body() createAuditDto: CreateAuditDto) {
+  //   return this.auditService.create(createAuditDto);
+  // }
 
-  @Get()
-  findAll() {
-    return this.auditService.findAll();
-  }
+  // @Get()
+  // findAll() {
+  //   return this.auditService.findAll();
+  // }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.auditService.findOne(+id);
-  }
+  // @Get(':id')
+  // findOne(@Param('id') id: string) {
+  //   return this.auditService.findOne(+id);
+  // }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateAuditDto: UpdateAuditDto) {
-    return this.auditService.update(+id, updateAuditDto);
-  }
+  // @Patch(':id')
+  // update(@Param('id') id: string, @Body() updateAuditDto: UpdateAuditDto) {
+  //   return this.auditService.update(+id, updateAuditDto);
+  // }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.auditService.remove(+id);
-  }
+  // @Delete(':id')
+  // remove(@Param('id') id: string) {
+  //   return this.auditService.remove(+id);
+  // }
 }
