@@ -97,46 +97,61 @@ export class AuthMiddleware implements NestMiddleware {
       .update(rawToken)
       .digest('hex');
 
-    const storedToken = await this.refreshTokenRepository.findOne({
-      where: { tokenHash, revokedAt: IsNull() },
-      relations: ['user'],
+    let user: User;
+    let newAccessToken: string;
+    let newRawRefreshToken: string;
+
+    await this.refreshTokenRepository.manager.transaction(async (manager) => {
+      const refreshTokenRepository = manager.getRepository(RefreshToken);
+
+      const storedToken = await refreshTokenRepository.findOne({
+        where: { tokenHash, revokedAt: IsNull() },
+        relations: ['user'],
+      });
+
+      if (!storedToken || storedToken.expiresAt < new Date()) {
+        throw new Error('Refresh token invalid or expired');
+      }
+
+      user = storedToken.user;
+      this.checkUserStatus(user); // Check bảo mật lần nữa
+
+      // TẠO ACCESS TOKEN MỚI
+      newAccessToken = await this.jwtService.signAsync(
+        { sub: user.id, email: user.email, role: user.role },
+        {
+          secret: process.env.JWT_SECRET,
+          expiresIn: (process.env.JWT_EXPIRES_IN || '15m') as any,
+        },
+      );
+
+      // TOKEN ROTATION: Tạo Refresh Token mới
+      newRawRefreshToken = crypto.randomBytes(64).toString('hex');
+      const newTokenHash = crypto
+        .createHash('sha256')
+        .update(newRawRefreshToken)
+        .digest('hex');
+
+      // Thu hồi token cũ một cách nguyên tử; chỉ 1 request đồng thời được phép thành công
+      const revokeResult = await refreshTokenRepository.update(
+        { id: storedToken.id, revokedAt: IsNull() },
+        { revokedAt: new Date() },
+      );
+
+      if (revokeResult.affected !== 1) {
+        throw new Error('Refresh token already used or revoked');
+      }
+
+      const newRefreshToken = refreshTokenRepository.create({
+        userId: user.id,
+        tokenHash: newTokenHash,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 ngày
+        deviceInfo: storedToken.deviceInfo,
+        ipAddress: storedToken.ipAddress,
+      });
+
+      await refreshTokenRepository.save(newRefreshToken);
     });
-
-    if (!storedToken || storedToken.expiresAt < new Date()) {
-      throw new Error('Refresh token invalid or expired');
-    }
-
-    const user = storedToken.user;
-    this.checkUserStatus(user); // Check bảo mật lần nữa
-
-    // TẠO ACCESS TOKEN MỚI
-    const newAccessToken = await this.jwtService.signAsync(
-      { sub: user.id, email: user.email, role: user.role },
-      {
-        secret: process.env.JWT_SECRET,
-        expiresIn: (process.env.JWT_EXPIRES_IN || '15m') as any,
-      },
-    );
-
-    // TOKEN ROTATION: Tạo Refresh Token mới
-    const newRawRefreshToken = crypto.randomBytes(64).toString('hex');
-    const newTokenHash = crypto
-      .createHash('sha256')
-      .update(newRawRefreshToken)
-      .digest('hex');
-
-    const newRefreshToken = this.refreshTokenRepository.create({
-      userId: user.id,
-      tokenHash: newTokenHash,
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 ngày
-      deviceInfo: storedToken.deviceInfo,
-      ipAddress: storedToken.ipAddress,
-    });
-
-    // Thu hồi token cũ
-    storedToken.revokedAt = new Date();
-    await this.refreshTokenRepository.save(storedToken);
-    await this.refreshTokenRepository.save(newRefreshToken);
 
     // QUAN TRỌNG: Ghi đè Access Token mới vào Header để Guard chạy sau thấy nó "hợp lệ"
     req.headers.authorization = `Bearer ${newAccessToken}`;
