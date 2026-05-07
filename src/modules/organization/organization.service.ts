@@ -219,16 +219,18 @@ export class OrganizationService {
       where: { tokenHash: token }
     });
 
+    const invalidInvitationMessage = 'Lời mời không hợp lệ';
+
     if (!invitation) {
-      throw new BadRequestException('Lời mời không tồn tại hoặc mã xác nhận sai');
+      throw new BadRequestException(invalidInvitationMessage);
     }
 
     if (invitation.acceptedAt) {
-      throw new BadRequestException('Lời mời này đã được sử dụng');
+      throw new BadRequestException(invalidInvitationMessage);
     }
 
     if (new Date() > invitation.expiresAt) {
-      throw new BadRequestException('Lời mời đã hết hạn');
+      throw new BadRequestException(invalidInvitationMessage);
     }
 
     const existingMember = await this.organizationMemberRepository.findOne({

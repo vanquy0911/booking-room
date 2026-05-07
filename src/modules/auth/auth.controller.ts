@@ -40,11 +40,14 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
     @Body() loginDto: LoginDto,
   ) {
-    const result = await this.authService.login(loginDto, {
-      ipAddress: req.ip,
-      deviceInfo: req.headers['user-agent'],
-    });
-    res.setHeader('x-refresh-token', result.refresh_token);
+    const { refresh_token, ...result } = await this.authService.login(
+      loginDto,
+      {
+        ipAddress: req.ip ?? req.socket.remoteAddress ?? null,
+        deviceInfo: req.headers['user-agent'],
+      },
+    );
+    res.setHeader('x-refresh-token', refresh_token);
     return result;
   }
 

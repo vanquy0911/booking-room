@@ -14,6 +14,8 @@ import { RefreshToken } from './entities/auth.entity';
 import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
 
+const REFRESH_TOKEN_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -73,7 +75,7 @@ export class AuthService {
     const refreshToken = new RefreshToken();
     refreshToken.userId = user.id;
     refreshToken.tokenHash = tokenHash;
-    refreshToken.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    refreshToken.expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS);
     refreshToken.ipAddress = metadata?.ipAddress ?? null;
     refreshToken.deviceInfo = metadata?.deviceInfo ?? null;
     await this.refreshTokenRepository.save(refreshToken);
