@@ -238,7 +238,7 @@ export class OrganizationService {
     });
 
     if (existingMember) {
-      throw new BadRequestException('Bạn đã là thành viên của tổ chức này');
+      throw new BadRequestException(invalidInvitationMessage);
     }
 
     // Đánh dấu lời mời đã được sử dụng
