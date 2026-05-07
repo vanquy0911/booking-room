@@ -136,7 +136,7 @@ export class UserService {
     });
     if (!target) throw new NotFoundException('Không tìm thấy user');
 
-    await this.userRepository.update({ id: targetUserId }, { lockedUntil: undefined });
+    await this.userRepository.update({ id: targetUserId }, { lockedUntil: null });
     return { message: `Đã mở khóa tài khoản ${target.email}` };
   }
 
