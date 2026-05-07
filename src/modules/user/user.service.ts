@@ -14,11 +14,13 @@ import { RefreshToken } from '../auth/entities/auth.entity';
 
 @Injectable()
 export class UserService {
+  private get userRepository(): Repository<User> {
+    return this.usersService;
+  }
+
   constructor(
     @InjectRepository(User)
     private usersService: Repository<User>,
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
     @InjectRepository(RefreshToken)
     private refreshTokenRepository: Repository<RefreshToken>,
   ) { }
