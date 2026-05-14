@@ -7,9 +7,11 @@ import {
   CreateDateColumn,
   DeleteDateColumn,
   Check,
+  OneToMany,
 } from 'typeorm';
 import { Organization } from '../../organization/entities/organization.entity';
 import { Floor } from '../../location/entities/floor.entity';
+import { RoomPhoto } from './room_photo.entity';
 
 @Entity('rooms')
 @Check(`"capacity" > 0`)
@@ -92,4 +94,7 @@ export class Room {
     nullable: true,
   })
   deletedAt: Date;
+
+  @OneToMany(() => RoomPhoto, (photo) => photo.room)
+  photos: RoomPhoto[];
 }

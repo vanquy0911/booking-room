@@ -1,26 +1,84 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Amenity } from './entities/amenities.entity';
+import { OrganizationMember } from '../organization/entities/organization_members.entity';
 import { CreateAmenityDto } from './dto/create-amenity.dto';
 import { UpdateAmenityDto } from './dto/update-amenity.dto';
 
 @Injectable()
 export class AmenityService {
-  create(createAmenityDto: CreateAmenityDto) {
-    return 'This action adds a new amenity';
+  constructor(
+    @InjectRepository(Amenity)
+    private readonly amenityRepository: Repository<Amenity>,
+
+    @InjectRepository(OrganizationMember)
+    private readonly organizationMemberRepository: Repository<OrganizationMember>,
+  ) { }
+
+  async create(orgId: string, membership: OrganizationMember, dto: CreateAmenityDto) {
+    // 1. Kiểm tra quyền admin
+    if (membership.role !== 'admin') {
+      throw new ForbiddenException('Bạn không có quyền tạo tiện ích');
+    }
+
+    // 2. Kiểm tra tên tiện ích trùng trong organization
+    const existing = await this.amenityRepository.findOne({
+      where: { organizationId: orgId, name: dto.name },
+    });
+
+    if (existing) {
+      throw new BadRequestException('Tiện ích này đã tồn tại trong tổ chức');
+    }
+
+    // 3. Tạo mới
+    const amenity = this.amenityRepository.create({
+      ...dto,
+      organizationId: orgId,
+    });
+
+    return this.amenityRepository.save(amenity);
   }
 
-  findAll() {
-    return `This action returns all amenity`;
+  async findAll(orgId: string) {
+    return this.amenityRepository.find({
+      where: { organizationId: orgId },
+      order: { name: 'ASC' },
+    });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} amenity`;
+  async findOne(id: string, orgId: string) {
+    const amenity = await this.amenityRepository.findOne({
+      where: { id, organizationId: orgId },
+    });
+    if (!amenity) throw new BadRequestException('Không tìm thấy tiện ích');
+    return amenity;
   }
 
-  update(id: number, updateAmenityDto: UpdateAmenityDto) {
-    return `This action updates a #${id} amenity`;
+  async update(
+    id: string,
+    orgId: string,
+    membership: OrganizationMember,
+    dto: UpdateAmenityDto,
+  ) {
+    if (membership.role !== 'admin')
+      throw new ForbiddenException('Bạn không có quyền chỉnh sửa tiện ích');
+
+    const amenity = await this.findOne(id, orgId);
+    Object.assign(amenity, dto);
+    return this.amenityRepository.save(amenity);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} amenity`;
+  async remove(id: string, orgId: string, membership: OrganizationMember) {
+    if (membership.role !== 'admin')
+      throw new ForbiddenException('Bạn không có quyền xóa tiện ích');
+
+    const amenity = await this.findOne(id, orgId);
+    await this.amenityRepository.remove(amenity);
+    return { message: 'Xóa tiện ích thành công' };
   }
 }

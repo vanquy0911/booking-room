@@ -21,7 +21,7 @@ export class UserService {
     private userRepository: Repository<User>,
     @InjectRepository(RefreshToken)
     private refreshTokenRepository: Repository<RefreshToken>,
-  ) { }
+  ) {}
 
   async findOneByEmail(email: string): Promise<User | null> {
     return this.usersService.findOne({
@@ -111,7 +111,8 @@ export class UserService {
       where: { id: targetUserId },
     });
     if (!target) throw new NotFoundException('Không tìm thấy user');
-    if (target.role === 'admin') throw new ForbiddenException('Không thể khóa tài khoản Admin');
+    if (target.role === 'admin')
+      throw new ForbiddenException('Không thể khóa tài khoản Admin');
 
     const lockedUntil = dto.lockedUntil
       ? new Date(dto.lockedUntil)
@@ -136,7 +137,10 @@ export class UserService {
     });
     if (!target) throw new NotFoundException('Không tìm thấy user');
 
-    await this.userRepository.update({ id: targetUserId }, { lockedUntil: undefined });
+    await this.userRepository.update(
+      { id: targetUserId },
+      { lockedUntil: undefined },
+    );
     return { message: `Đã mở khóa tài khoản ${target.email}` };
   }
 
@@ -150,8 +154,10 @@ export class UserService {
       withDeleted: true,
     });
     if (!target) throw new NotFoundException('Không tìm thấy user');
-    if (target.deletedAt) throw new BadRequestException('Tài khoản đã bị xóa trước đó');
-    if (target.role === 'admin') throw new ForbiddenException('Không thể xóa tài khoản Admin');
+    if (target.deletedAt)
+      throw new BadRequestException('Tài khoản đã bị xóa trước đó');
+    if (target.role === 'admin')
+      throw new ForbiddenException('Không thể xóa tài khoản Admin');
 
     // Thu hồi toàn bộ Refresh Token → Buộc đăng xuất ngay
     await this.refreshTokenRepository.update(
@@ -174,6 +180,4 @@ export class UserService {
     await this.userRepository.restore({ id: targetUserId });
     return { message: `Đã khôi phục tài khoản ${target.email}` };
   }
-
-
 }

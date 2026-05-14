@@ -19,7 +19,7 @@ import { InviteMemberDto } from './dto/invite-member.dto';
 
 @Controller('organization')
 export class OrganizationController {
-  constructor(private readonly organizationService: OrganizationService) { }
+  constructor(private readonly organizationService: OrganizationService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create organization' })
@@ -60,10 +60,7 @@ export class OrganizationController {
   @ApiOperation({ summary: 'Delete organization' })
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
-  remove(
-    @Param('orgId') orgId: string,
-    @User('id') userId: string,
-  ) {
+  remove(@Param('orgId') orgId: string, @User('id') userId: string) {
     return this.organizationService.remove(orgId, userId);
   }
 
@@ -78,9 +75,7 @@ export class OrganizationController {
   @Get('register')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
-  registerPage(
-    @Query('invitation_token') token: string,
-  ) {
+  registerPage(@Query('invitation_token') token: string) {
     return this.organizationService.verifyInvitation(token);
   }
 
@@ -100,10 +95,7 @@ export class OrganizationController {
   @ApiOperation({ summary: 'Get members of an organization' })
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
-  getMembers(
-    @Param('orgId') orgId: string,
-    @User('id') userId: string,
-  ) {
+  getMembers(@Param('orgId') orgId: string, @User('id') userId: string) {
     return this.organizationService.getMembers(orgId, userId);
   }
 }

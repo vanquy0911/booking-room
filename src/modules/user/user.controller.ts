@@ -19,7 +19,7 @@ import { LockUserDto } from './dto/lock-user.dto';
 @ApiBearerAuth()
 @Controller('user')
 export class UserController {
-  constructor(private readonly userService: UserService) { }
+  constructor(private readonly userService: UserService) {}
 
   @Get()
   @ApiOperation({ summary: '[Admin] Lấy danh sách toàn bộ user' })
@@ -38,17 +38,16 @@ export class UserController {
     @User('id') requesterId: string,
     @User('role') role: string,
   ) {
-    if (role !== Role.ADMIN) throw new ForbiddenException('Chỉ Admin mới có quyền này');
+    if (role !== Role.ADMIN)
+      throw new ForbiddenException('Chỉ Admin mới có quyền này');
     return this.userService.lockUser(targetId, dto, requesterId);
   }
 
   @Patch(':id/unlock')
   @ApiOperation({ summary: '[Admin] Mở khóa tài khoản user' })
-  async unlockUser(
-    @Param('id') targetId: string,
-    @User('role') role: string,
-  ) {
-    if (role !== Role.ADMIN) throw new ForbiddenException('Chỉ Admin mới có quyền này');
+  async unlockUser(@Param('id') targetId: string, @User('role') role: string) {
+    if (role !== Role.ADMIN)
+      throw new ForbiddenException('Chỉ Admin mới có quyền này');
     return this.userService.unlockUser(targetId);
   }
 
@@ -59,18 +58,16 @@ export class UserController {
     @User('id') requesterId: string,
     @User('role') role: string,
   ) {
-    if (role !== Role.ADMIN) throw new ForbiddenException('Chỉ Admin mới có quyền này');
+    if (role !== Role.ADMIN)
+      throw new ForbiddenException('Chỉ Admin mới có quyền này');
     return this.userService.deleteUser(targetId, requesterId);
   }
 
   @Patch(':id/restore')
   @ApiOperation({ summary: '[Admin] Khôi phục tài khoản đã xóa' })
-  async restoreUser(
-    @Param('id') targetId: string,
-    @User('role') role: string,
-  ) {
-    if (role !== Role.ADMIN) throw new ForbiddenException('Chỉ Admin mới có quyền này');
+  async restoreUser(@Param('id') targetId: string, @User('role') role: string) {
+    if (role !== Role.ADMIN)
+      throw new ForbiddenException('Chỉ Admin mới có quyền này');
     return this.userService.restoreUser(targetId);
   }
 }
-

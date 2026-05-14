@@ -21,6 +21,8 @@ import { RefreshToken } from './modules/auth/entities/auth.entity';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './commons/guard/JwtAuthGuard.guard';
 import { AuthMiddleware } from './commons/middlewares/auth.middleware';
+import { OrganizationMember } from './modules/organization/entities/organization_members.entity';
+import { TenantContextMiddleware } from './commons/middlewares/tenant-context.middleware';
 
 @Module({
   imports: [
@@ -48,7 +50,7 @@ import { AuthMiddleware } from './commons/middlewares/auth.middleware';
     }),
 
     // Đăng ký Entity cho Middleware dùng
-    TypeOrmModule.forFeature([User, RefreshToken]),
+    TypeOrmModule.forFeature([User, RefreshToken, OrganizationMember]),
 
     UserModule,
     BookingModule,
@@ -60,10 +62,11 @@ import { AuthMiddleware } from './commons/middlewares/auth.middleware';
     NotificationModule,
   ],
   controllers: [AppController],
-  providers: [AppService,
+  providers: [
+    AppService,
     {
       provide: APP_GUARD,
-      useClass: JwtAuthGuard
+      useClass: JwtAuthGuard,
     },
   ],
 })
@@ -72,6 +75,9 @@ export class AppModule implements NestModule {
     consumer
       .apply(AuthMiddleware) // Chạy trước để "sửa lỗi" token nếu cần
       .forRoutes('*');
+
+    // consumer
+    //   .apply(TenantContextMiddleware)
+    //   .forRoutes('room', 'location', 'amenity', 'booking');
   }
 }
-

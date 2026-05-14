@@ -35,7 +35,7 @@ export class MaintenanceBlock {
     nullable: true,
     comment: 'Recurring maintenance rule (RFC 5545)',
   })
-  rrule: string;
+  rule: string;
 
   // FK -> users
   @Column({ name: 'created_by', type: 'uuid' })

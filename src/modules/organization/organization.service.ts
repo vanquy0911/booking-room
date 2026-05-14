@@ -26,7 +26,7 @@ export class OrganizationService {
     @InjectRepository(OrganizationInvitation)
     private readonly organizationInvitationRepository: Repository<OrganizationInvitation>,
     private readonly dataSource: DataSource,
-  ) { }
+  ) {}
 
   async create(createDto: CreateOrganizationDto, userId: string) {
     // Tạo đối tượng organization mới gắn với ownerId là người đang login
@@ -155,7 +155,7 @@ export class OrganizationService {
       where: { userId: userId },
       relations: ['organization'],
     });
-    return membership.map(member => member.organization);
+    return membership.map((member) => member.organization);
   }
   async verifyInvitation(token: string) {
     if (!token) {
@@ -168,7 +168,9 @@ export class OrganizationService {
     });
 
     if (!invitation) {
-      throw new BadRequestException('Lời mời không tồn tại hoặc mã xác nhận sai');
+      throw new BadRequestException(
+        'Lời mời không tồn tại hoặc mã xác nhận sai',
+      );
     }
 
     if (invitation.acceptedAt) {
@@ -196,7 +198,7 @@ export class OrganizationService {
 
   async acceptInvitation(token: string, userId: string) {
     const invitation = await this.organizationInvitationRepository.findOne({
-      where: { tokenHash: token }
+      where: { tokenHash: token },
     });
 
     const invalidInvitationMessage = 'Lời mời không hợp lệ';
@@ -241,7 +243,9 @@ export class OrganizationService {
     });
 
     if (!isMember) {
-      throw new ForbiddenException('Bạn không có quyền xem danh sách thành viên của tổ chức này');
+      throw new ForbiddenException(
+        'Bạn không có quyền xem danh sách thành viên của tổ chức này',
+      );
     }
 
     // Lấy danh sách thành viên kèm theo thông tin User
@@ -252,21 +256,27 @@ export class OrganizationService {
     });
 
     // Map lại dữ liệu để trả về những thông tin cần thiết, ẩn đi mật khẩu của user
-    return members.map(member => ({
+    return members.map((member) => ({
       memberId: member.id,
       role: member.role,
       joinedAt: member.joinedAt,
-      user: member.user ? {
-        id: member.user.id,
-        fullName: member.user.fullName,
-        email: member.user.email,
-        timezone: member.user.timezone,
-      } : null
+      user: member.user
+        ? {
+            id: member.user.id,
+            fullName: member.user.fullName,
+            email: member.user.email,
+            timezone: member.user.timezone,
+          }
+        : null,
     }));
   }
 
   //hàm update tổ chức
-  async update(orgId: string, updateDto: UpdateOrganizationDto, userId: string) {
+  async update(
+    orgId: string,
+    updateDto: UpdateOrganizationDto,
+    userId: string,
+  ) {
     const isAdmin = await this.organizationMemberRepository.findOne({
       where: { organizationId: orgId, userId, role: 'admin' },
     });
@@ -275,7 +285,9 @@ export class OrganizationService {
       throw new ForbiddenException('Bạn không có quyền chỉnh sửa tổ chức này');
     }
 
-    const org = await this.organizationRepository.findOne({ where: { id: orgId } });
+    const org = await this.organizationRepository.findOne({
+      where: { id: orgId },
+    });
     if (!org) {
       throw new BadRequestException('Không tìm thấy tổ chức');
     }
@@ -302,8 +314,10 @@ export class OrganizationService {
     }
 
     if (updateDto.plan) org.plan = updateDto.plan;
-    if (updateDto.workingHoursStart) org.workingHoursStart = updateDto.workingHoursStart;
-    if (updateDto.workingHoursEnd) org.workingHoursEnd = updateDto.workingHoursEnd;
+    if (updateDto.workingHoursStart)
+      org.workingHoursStart = updateDto.workingHoursStart;
+    if (updateDto.workingHoursEnd)
+      org.workingHoursEnd = updateDto.workingHoursEnd;
     if (updateDto.workingDays) org.workingDays = updateDto.workingDays;
 
     return this.organizationRepository.save(org);
@@ -319,7 +333,9 @@ export class OrganizationService {
       throw new ForbiddenException('Bạn không có quyền xóa tổ chức này');
     }
 
-    const org = await this.organizationRepository.findOne({ where: { id: orgId } });
+    const org = await this.organizationRepository.findOne({
+      where: { id: orgId },
+    });
     if (!org) {
       throw new BadRequestException('Không tìm thấy tổ chức');
     }

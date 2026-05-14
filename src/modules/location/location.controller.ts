@@ -16,6 +16,8 @@ import { UpdateFloorDto } from './dto/update-floor.dto';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { User } from '../../commons/decorators/user.decorator';
+import { OrgId, Membership } from '../../commons/decorators/tenant.decorator';
+import { OrganizationMember } from '../organization/entities/organization_members.entity';
 
 @ApiTags('location')
 @Controller('location')
@@ -27,11 +29,11 @@ export class LocationController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   createLocation(
-    @Param('orgId') orgId: string,
-    @User('id') userId: string,
+    @OrgId() orgId: string,
+    @Membership() membership: OrganizationMember,
     @Body() createLocationDto: CreateLocationDto,
   ) {
-    return this.locationService.create(orgId, userId, createLocationDto);
+    return this.locationService.create(orgId, membership, createLocationDto);
   }
 
   @Post(':orgId/floor/:locationId')
@@ -39,21 +41,25 @@ export class LocationController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   createFloor(
-    @Param('orgId') orgId: string,
+    @OrgId() orgId: string,
     @Param('locationId') locationId: string,
-    @User('id') userId: string,
+    @Membership() membership: OrganizationMember,
     @Body() createFloorDto: CreateFloorDto,
   ) {
-    return this.locationService.createFloor(locationId, orgId, userId, createFloorDto);
+    return this.locationService.createFloor(
+      locationId,
+      orgId,
+      membership,
+      createFloorDto,
+    );
   }
-
 
   @Get(':orgId')
   @ApiOperation({ summary: 'Lấy danh sách location của tổ chức' })
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
-  findAllLocations(@Param('orgId') orgId: string, @User('id') userId: string) {
-    return this.locationService.findAllLocations(orgId, userId);
+  findAllLocations(@OrgId() orgId: string) {
+    return this.locationService.findAllLocations(orgId);
   }
 
   @Get(':orgId/:locationId')
@@ -61,11 +67,10 @@ export class LocationController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   findOneLocation(
-    @Param('orgId') orgId: string,
+    @OrgId() orgId: string,
     @Param('locationId') locationId: string,
-    @User('id') userId: string,
   ) {
-    return this.locationService.findOneLocation(locationId, orgId, userId);
+    return this.locationService.findOneLocation(locationId, orgId);
   }
 
   @Patch(':orgId/:locationId')
@@ -73,12 +78,11 @@ export class LocationController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   updateLocation(
-    @Param('orgId') orgId: string,
+    @OrgId() orgId: string,
     @Param('locationId') locationId: string,
-    @User('id') userId: string,
     @Body() dto: UpdateLocationDto,
   ) {
-    return this.locationService.updateLocation(locationId, orgId, userId, dto);
+    return this.locationService.updateLocation(locationId, orgId, dto);
   }
 
   @Delete(':orgId/:locationId')
@@ -86,24 +90,21 @@ export class LocationController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   removeLocation(
-    @Param('orgId') orgId: string,
+    @OrgId() orgId: string,
     @Param('locationId') locationId: string,
-    @User('id') userId: string,
   ) {
-    return this.locationService.removeLocation(locationId, orgId, userId);
+    return this.locationService.removeLocation(locationId, orgId);
   }
-
 
   @Get(':orgId/floor/:locationId')
   @ApiOperation({ summary: 'Lấy danh sách tầng của một location' })
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   findAllFloors(
-    @Param('orgId') orgId: string,
+    @OrgId() orgId: string,
     @Param('locationId') locationId: string,
-    @User('id') userId: string,
   ) {
-    return this.locationService.findAllFloors(locationId, orgId, userId);
+    return this.locationService.findAllFloors(locationId, orgId);
   }
 
   @Get(':orgId/floor/:locationId/:floorId')
@@ -111,12 +112,15 @@ export class LocationController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   findOneFloor(
-    @Param('orgId') orgId: string,
+    @OrgId() orgId: string,
     @Param('locationId') locationId: string,
     @Param('floorId') floorId: string,
-    @User('id') userId: string,
   ) {
-    return this.locationService.findOneFloor(floorId, locationId, orgId, userId);
+    return this.locationService.findOneFloor(
+      floorId,
+      locationId,
+      orgId,
+    );
   }
 
   @Patch(':orgId/floor/:locationId/:floorId')
@@ -124,13 +128,17 @@ export class LocationController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   updateFloor(
-    @Param('orgId') orgId: string,
+    @OrgId() orgId: string,
     @Param('locationId') locationId: string,
     @Param('floorId') floorId: string,
-    @User('id') userId: string,
     @Body() dto: UpdateFloorDto,
   ) {
-    return this.locationService.updateFloor(floorId, locationId, orgId, userId, dto);
+    return this.locationService.updateFloor(
+      floorId,
+      locationId,
+      orgId,
+      dto,
+    );
   }
 
   @Delete(':orgId/floor/:locationId/:floorId')
@@ -138,11 +146,10 @@ export class LocationController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   removeFloor(
-    @Param('orgId') orgId: string,
+    @OrgId() orgId: string,
     @Param('locationId') locationId: string,
     @Param('floorId') floorId: string,
-    @User('id') userId: string,
   ) {
-    return this.locationService.removeFloor(floorId, locationId, orgId, userId);
+    return this.locationService.removeFloor(floorId, locationId, orgId);
   }
 }

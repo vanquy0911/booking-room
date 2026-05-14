@@ -11,4 +11,4 @@ import { OrganizationMember } from '../organization/entities/organization_member
   controllers: [LocationController],
   providers: [LocationService],
 })
-export class LocationModule { }
+export class LocationModule {}

@@ -28,26 +28,8 @@ export class LocationService {
     private readonly organizationMemberRepository: Repository<OrganizationMember>,
   ) { }
 
-  async create(
-    orgId: string,
-    userId: string,
-    dto: CreateLocationDto,
-  ) {
-    // Kiểm tra user có thuộc organization không
-    const member =
-      await this.organizationMemberRepository.findOne({
-        where: {
-          organizationId: orgId,
-          userId,
-        },
-        relations: ['organization'],
-      });
-
-    if (!member) {
-      throw new ForbiddenException(
-        'Bạn không thuộc organization này',
-      );
-    }
+  async create(orgId: string, membership: OrganizationMember, dto: CreateLocationDto) {
+    // Generate slug từ name
 
     // Generate slug từ name
     const slug = slugify(dto.name, {
@@ -57,36 +39,29 @@ export class LocationService {
     });
 
     // Check slug unique trong organization
-    const existingLocation =
-      await this.locationRepository.findOne({
-        where: {
-          organizationId: orgId,
-          slug,
-        },
-      });
+    const existingLocation = await this.locationRepository.findOne({
+      where: {
+        organizationId: orgId,
+        slug,
+      },
+    });
 
     if (existingLocation) {
-      throw new BadRequestException(
-        'Slug đã tồn tại trong organization',
-      );
+      throw new BadRequestException('Slug đã tồn tại trong organization');
     }
 
     // Tạo location
-    const location =
-      this.locationRepository.create({
-        name: dto.name,
-        slug,
-        timezone: member.organization.defaultTimezone,
+    const location = this.locationRepository.create({
+      name: dto.name,
+      slug,
+      timezone: membership.organization?.defaultTimezone || 'UTC',
 
-        organizationId: orgId,
-        address: dto.address,
-      });
+      organizationId: orgId,
+      address: dto.address,
+    });
 
     // Lưu DB
-    const savedLocation =
-      await this.locationRepository.save(
-        location,
-      );
+    const savedLocation = await this.locationRepository.save(location);
 
     return {
       message: 'Tạo location thành công',
@@ -97,17 +72,9 @@ export class LocationService {
   async createFloor(
     locationId: string,
     orgId: string,
-    userId: string,
+    membership: OrganizationMember,
     dto: CreateFloorDto,
   ) {
-    // Kiểm tra quyền (user có thuộc org không)
-    const member = await this.organizationMemberRepository.findOne({
-      where: { organizationId: orgId, userId },
-    });
-
-    if (!member) {
-      throw new ForbiddenException('Bạn không thuộc organization này');
-    }
 
     // Kiểm tra xem location có tồn tại và thuộc org này không
     const location = await this.locationRepository.findOne({
@@ -115,7 +82,9 @@ export class LocationService {
     });
 
     if (!location) {
-      throw new BadRequestException('Location không tồn tại hoặc không thuộc tổ chức này');
+      throw new BadRequestException(
+        'Location không tồn tại hoặc không thuộc tổ chức này',
+      );
     }
 
     // Tạo floor
@@ -134,25 +103,20 @@ export class LocationService {
   }
 
   // check quyền trong organization
-  private async checkOrgMembership(orgId: string, userId: string) {
-    const member = await this.organizationMemberRepository.findOne({
-      where: { organizationId: orgId, userId },
-      relations: ['organization'],
-    });
-    if (!member) throw new ForbiddenException('Bạn không thuộc organization này');
-    return member;
+  private checkOrgMembership(membership: OrganizationMember) {
+    if (!membership)
+      throw new ForbiddenException('Bạn không thuộc organization này');
+    return membership;
   }
 
-  async findAllLocations(orgId: string, userId: string) {
-    await this.checkOrgMembership(orgId, userId);
+  async findAllLocations(orgId: string) {
     return this.locationRepository.find({
       where: { organizationId: orgId },
       order: { name: 'ASC' },
     });
   }
 
-  async findOneLocation(locationId: string, orgId: string, userId: string) {
-    await this.checkOrgMembership(orgId, userId);
+  async findOneLocation(locationId: string, orgId: string) {
     const location = await this.locationRepository.findOne({
       where: { id: locationId, organizationId: orgId },
     });
@@ -167,8 +131,11 @@ export class LocationService {
     return { ...location, floors };
   }
 
-  async updateLocation(locationId: string, orgId: string, userId: string, dto: UpdateLocationDto) {
-    await this.checkOrgMembership(orgId, userId);
+  async updateLocation(
+    locationId: string,
+    orgId: string,
+    dto: UpdateLocationDto,
+  ) {
     const location = await this.locationRepository.findOne({
       where: { id: locationId, organizationId: orgId },
     });
@@ -197,8 +164,7 @@ export class LocationService {
     };
   }
 
-  async removeLocation(locationId: string, orgId: string, userId: string) {
-    await this.checkOrgMembership(orgId, userId);
+  async removeLocation(locationId: string, orgId: string) {
     const location = await this.locationRepository.findOne({
       where: { id: locationId, organizationId: orgId },
     });
@@ -208,16 +174,18 @@ export class LocationService {
     return { message: 'Xóa location thành công' };
   }
 
-  async findAllFloors(locationId: string, orgId: string, userId: string) {
-    await this.checkOrgMembership(orgId, userId);
+  async findAllFloors(locationId: string, orgId: string) {
     return this.floorRepository.find({
       where: { locationId },
       order: { floorNumber: 'ASC' },
     });
   }
 
-  async findOneFloor(floorId: string, locationId: string, orgId: string, userId: string) {
-    await this.checkOrgMembership(orgId, userId);
+  async findOneFloor(
+    floorId: string,
+    locationId: string,
+    orgId: string,
+  ) {
     const floor = await this.floorRepository.findOne({
       where: { id: floorId, locationId },
     });
@@ -225,8 +193,12 @@ export class LocationService {
     return floor;
   }
 
-  async updateFloor(floorId: string, locationId: string, orgId: string, userId: string, dto: UpdateFloorDto) {
-    await this.checkOrgMembership(orgId, userId);
+  async updateFloor(
+    floorId: string,
+    locationId: string,
+    orgId: string,
+    dto: UpdateFloorDto,
+  ) {
     const floor = await this.floorRepository.findOne({
       where: { id: floorId, locationId },
     });
@@ -242,8 +214,11 @@ export class LocationService {
     };
   }
 
-  async removeFloor(floorId: string, locationId: string, orgId: string, userId: string) {
-    await this.checkOrgMembership(orgId, userId);
+  async removeFloor(
+    floorId: string,
+    locationId: string,
+    orgId: string,
+  ) {
     const floor = await this.floorRepository.findOne({
       where: { id: floorId, locationId },
     });
