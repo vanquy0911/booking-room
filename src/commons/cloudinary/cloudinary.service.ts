@@ -4,11 +4,11 @@ import * as streamifier from 'streamifier';
 
 @Injectable()
 export class CloudinaryService {
-  async uploadFile(file: Express.Multer.File): Promise<UploadApiResponse | UploadApiErrorResponse> {
+  async uploadFile(file: Express.Multer.File, folder = 'booking_room'): Promise<UploadApiResponse | UploadApiErrorResponse> {
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
-          folder: 'booking_room',
+          folder,
         },
         (error, result) => {
           if (error) return reject(error);

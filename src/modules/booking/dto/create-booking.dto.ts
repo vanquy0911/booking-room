@@ -1,5 +1,28 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDateString, IsNotEmpty, IsString, IsUUID } from 'class-validator';
+import {
+  IsArray,
+  IsDateString,
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+  ArrayMaxSize,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class AttendeeDto {
+  @ApiProperty({ required: false })
+  @IsUUID()
+  @IsOptional()
+  userId?: string;
+
+  @ApiProperty({ required: false })
+  @IsEmail()
+  @IsOptional()
+  email?: string;
+}
 
 export class CreateBookingDto {
   @ApiProperty()
@@ -7,28 +30,31 @@ export class CreateBookingDto {
   @IsNotEmpty()
   roomId: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'Họp Team hàng tuần' })
   @IsString()
   @IsNotEmpty()
-  reason: string;
+  title: string;
+
+  @ApiProperty({ example: 'Thảo luận về kế hoạch tháng tới', required: false })
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @ApiProperty({ example: '2026-05-14T10:00:00Z' })
+  @IsDateString()
+  @IsNotEmpty()
+  startTime: string;
 
   @ApiProperty()
   @IsDateString()
   @IsNotEmpty()
-  startTime: Date;
+  endTime: string;
 
-  @ApiProperty()
-  @IsDateString()
-  @IsNotEmpty()
-  endTime: Date;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  attendees: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  description: string;
+  @ApiProperty({ type: [AttendeeDto], required: false })
+  @IsArray()
+  @IsOptional()
+  @ArrayMaxSize(50, { message: 'Chỉ được mời tối đa 50 người cùng lúc' })
+  @ValidateNested({ each: true })
+  @Type(() => AttendeeDto)
+  attendees?: AttendeeDto[];
 }

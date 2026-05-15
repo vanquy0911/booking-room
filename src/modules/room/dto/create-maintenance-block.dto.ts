@@ -3,12 +3,20 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateMaintenanceBlockDto {
   @ApiProperty({
-    example: '[2024-05-20 08:00, 2024-05-20 10:00]',
-    description: 'Khoảng thời gian bảo trì',
+    example: '2024-05-20 08:00:00',
+    description: 'Thời gian bắt đầu bảo trì',
   })
   @IsString()
   @IsNotEmpty()
-  timeRange: string;
+  startTime: string;
+
+  @ApiProperty({
+    example: '2024-05-20 10:00:00',
+    description: 'Thời gian kết thúc bảo trì',
+  })
+  @IsString()
+  @IsNotEmpty()
+  endTime: string;
 
   @ApiProperty({
     example: 'Vệ sinh định kỳ hàng tuần',

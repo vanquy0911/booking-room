@@ -3,6 +3,7 @@ import {
   Column,
   PrimaryGeneratedColumn,
   ManyToOne,
+  OneToMany,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
@@ -11,6 +12,8 @@ import {
 import { Organization } from '../../organization/entities/organization.entity';
 import { Room } from '../../room/entities/room.entity';
 import { User } from '../../user/entities/user.entity';
+import { BookingAttendee } from './booking_attendee.entity';
+import { BookingSeries } from './booking_series.entity';
 
 export enum BookingStatus {
   PENDING = 'pending',
@@ -72,6 +75,10 @@ export class Booking {
   @Column({ name: 'series_id', type: 'uuid', nullable: true })
   seriesId: string;
 
+  @ManyToOne(() => BookingSeries)
+  @JoinColumn({ name: 'series_id' })
+  series: BookingSeries;
+
   @Column({ name: 'series_instance_date', type: 'date', nullable: true })
   seriesInstanceDate: string;
 
@@ -90,6 +97,13 @@ export class Booking {
 
   @Column({ name: 'checked_in_at', type: 'timestamptz', nullable: true })
   checkedInAt: Date;
+
+  @Column({ name: 'checked_in_by', type: 'uuid', nullable: true })
+  checkedInBy: string;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'checked_in_by' })
+  checkInUser: User;
 
   @Column({ name: 'cancelled_by', type: 'uuid', nullable: true })
   cancelledBy: string;
@@ -131,4 +145,7 @@ export class Booking {
     default: () => 'now()',
   })
   updatedAt: Date;
+
+  @OneToMany(() => BookingAttendee, (attendee) => attendee.booking)
+  attendees: BookingAttendee[];
 }

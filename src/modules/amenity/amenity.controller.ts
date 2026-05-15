@@ -14,8 +14,6 @@ import { UpdateAmenityDto } from './dto/update-amenity.dto';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { User } from '../../commons/decorators/user.decorator';
-import { OrgId, Membership } from '../../commons/decorators/tenant.decorator';
-import { OrganizationMember } from '../organization/entities/organization_members.entity';
 
 @ApiTags('amenity')
 @Controller('amenity')
@@ -27,18 +25,18 @@ export class AmenityController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   create(
-    @OrgId() orgId: string,
-    @Membership() membership: OrganizationMember,
+    @Param('orgId') orgId: string,
+    @User('id') userId: string,
     @Body() createAmenityDto: CreateAmenityDto,
   ) {
-    return this.amenityService.create(orgId, membership, createAmenityDto);
+    return this.amenityService.create(orgId, userId, createAmenityDto);
   }
 
   @Get(':orgId')
   @ApiOperation({ summary: 'Lấy danh sách tiện ích của tổ chức' })
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
-  findAll(@OrgId() orgId: string) {
+  findAll(@Param('orgId') orgId: string) {
     return this.amenityService.findAll(orgId);
   }
 
@@ -46,7 +44,7 @@ export class AmenityController {
   @ApiOperation({ summary: 'Xem chi tiết tiện ích' })
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
-  findOne(@OrgId() orgId: string, @Param('id') id: string) {
+  findOne(@Param('orgId') orgId: string, @Param('id') id: string) {
     return this.amenityService.findOne(id, orgId);
   }
 
@@ -55,12 +53,12 @@ export class AmenityController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   update(
-    @OrgId() orgId: string,
+    @Param('orgId') orgId: string,
     @Param('id') id: string,
-    @Membership() membership: OrganizationMember,
+    @User('id') userId: string,
     @Body() updateAmenityDto: UpdateAmenityDto,
   ) {
-    return this.amenityService.update(id, orgId, membership, updateAmenityDto);
+    return this.amenityService.update(id, orgId, userId, updateAmenityDto);
   }
 
   @Delete(':orgId/:id')
@@ -68,10 +66,10 @@ export class AmenityController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   remove(
-    @OrgId() orgId: string,
+    @Param('orgId') orgId: string,
     @Param('id') id: string,
-    @Membership() membership: OrganizationMember,
+    @User('id') userId: string,
   ) {
-    return this.amenityService.remove(id, orgId, membership);
+    return this.amenityService.remove(id, orgId, userId);
   }
 }

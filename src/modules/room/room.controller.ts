@@ -27,9 +27,7 @@ import {
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { User } from '../../commons/decorators/user.decorator';
-import { OrgId, Membership } from '../../commons/decorators/tenant.decorator';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { OrganizationMember } from '../organization/entities/organization_members.entity';
 
 @ApiTags('room')
 @Controller('room')
@@ -41,11 +39,11 @@ export class RoomController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   create(
-    @OrgId() orgId: string,
-    @Membership() membership: OrganizationMember,
+    @Param('orgId') orgId: string,
+    @User('id') userId: string,
     @Body() createRoomDto: CreateRoomDto,
   ) {
-    return this.roomService.create(orgId, membership, createRoomDto);
+    return this.roomService.create(orgId, userId, createRoomDto);
   }
 
   @Get(':orgId')
@@ -59,7 +57,7 @@ export class RoomController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   findAll(
-    @OrgId() orgId: string,
+    @Param('orgId') orgId: string,
     @Query('amenities') amenities?: string,
   ) {
     return this.roomService.findAll(orgId, amenities);
@@ -70,7 +68,7 @@ export class RoomController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   findAvailable(
-    @OrgId() orgId: string,
+    @Param('orgId') orgId: string,
     @Query() dto: FindAvailableRoomsDto,
   ) {
     return this.roomService.findAvailableRooms(orgId, dto);
@@ -114,15 +112,15 @@ export class RoomController {
     }),
   )
   uploadPhotos(
-    @OrgId() orgId: string,
+    @Param('orgId') orgId: string,
     @Param('roomId') roomId: string,
-    @Membership() membership: OrganizationMember,
+    @User('id') userId: string,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
     if (!files || files.length === 0) {
       throw new BadRequestException('Vui lòng chọn ít nhất 1 ảnh');
     }
-    return this.roomService.uploadPhotos(orgId, roomId, membership, files);
+    return this.roomService.uploadPhotos(orgId, roomId, userId, files);
   }
 
   @Patch(':orgId/:roomId')
@@ -130,12 +128,12 @@ export class RoomController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   update(
-    @OrgId() orgId: string,
+    @Param('orgId') orgId: string,
     @Param('roomId') roomId: string,
-    @Membership() membership: OrganizationMember,
+    @User('id') userId: string,
     @Body() updateRoomDto: UpdateRoomDto,
   ) {
-    return this.roomService.update(orgId, roomId, membership, updateRoomDto);
+    return this.roomService.update(orgId, roomId, userId, updateRoomDto);
   }
 
   @Delete(':orgId/:roomId')
@@ -143,11 +141,11 @@ export class RoomController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   remove(
-    @OrgId() orgId: string,
+    @Param('orgId') orgId: string,
     @Param('roomId') roomId: string,
-    @Membership() membership: OrganizationMember,
+    @User('id') userId: string,
   ) {
-    return this.roomService.remove(orgId, roomId, membership);
+    return this.roomService.remove(orgId, roomId, userId);
   }
 
   @Post(':orgId/:roomId/maintenance-blocks')
@@ -155,12 +153,12 @@ export class RoomController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   createMaintenanceBlock(
-    @OrgId() orgId: string,
+    @Param('orgId') orgId: string,
     @Param('roomId') roomId: string,
-    @Membership() membership: OrganizationMember,
+    @User('id') userId: string,
     @Body() dto: CreateMaintenanceBlockDto,
   ) {
-    return this.roomService.createMaintenanceBlock(orgId, roomId, membership, dto);
+    return this.roomService.createMaintenanceBlock(orgId, roomId, userId, dto);
   }
 
   @Get(':orgId/:roomId/maintenance-blocks')
@@ -168,11 +166,11 @@ export class RoomController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   findAllMaintenanceBlocks(
-    @OrgId() orgId: string,
+    @Param('orgId') orgId: string,
     @Param('roomId') roomId: string,
-    @Membership() membership: OrganizationMember,
+    @User('id') userId: string,
   ) {
-    return this.roomService.findAllMaintenanceBlocks(orgId, roomId, membership);
+    return this.roomService.findAllMaintenanceBlocks(orgId, roomId, userId);
   }
 
   @Delete(':orgId/maintenance-blocks/:blockId')
@@ -180,10 +178,10 @@ export class RoomController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   removeMaintenanceBlock(
-    @OrgId() orgId: string,
+    @Param('orgId') orgId: string,
     @Param('blockId') blockId: string,
-    @Membership() membership: OrganizationMember,
+    @User('id') userId: string,
   ) {
-    return this.roomService.removeMaintenanceBlock(orgId, blockId, membership);
+    return this.roomService.removeMaintenanceBlock(orgId, blockId, userId);
   }
 }

@@ -12,6 +12,7 @@ import {
 import { Organization } from '../../organization/entities/organization.entity';
 import { Floor } from '../../location/entities/floor.entity';
 import { RoomPhoto } from './room_photo.entity';
+import { RoomAmenity } from '../../amenity/entities/room_amenities.entity';
 
 @Entity('rooms')
 @Check(`"capacity" > 0`)
@@ -97,4 +98,7 @@ export class Room {
 
   @OneToMany(() => RoomPhoto, (photo) => photo.room)
   photos: RoomPhoto[];
+
+  @OneToMany(() => RoomAmenity, (ra) => ra.room)
+  roomAmenities: RoomAmenity[];
 }

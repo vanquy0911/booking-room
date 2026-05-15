@@ -22,7 +22,9 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './commons/guard/JwtAuthGuard.guard';
 import { AuthMiddleware } from './commons/middlewares/auth.middleware';
 import { OrganizationMember } from './modules/organization/entities/organization_members.entity';
-import { TenantContextMiddleware } from './commons/middlewares/tenant-context.middleware';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
+// import { TenantContextMiddleware } from './commons/middlewares/tenant-context.middleware';
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { TenantContextMiddleware } from './commons/middlewares/tenant-context.mi
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(),
 
     // Cấu hình kết nối Database bằng TypeORM (lấy thông tin từ file .env)
     TypeOrmModule.forRootAsync({
@@ -76,8 +80,8 @@ export class AppModule implements NestModule {
       .apply(AuthMiddleware) // Chạy trước để "sửa lỗi" token nếu cần
       .forRoutes('*');
 
-    // consumer
-    //   .apply(TenantContextMiddleware)
-    //   .forRoutes('room', 'location', 'amenity', 'booking');
+    //   consumer
+    //     .apply(TenantContextMiddleware)
+    //     .forRoutes('room/(.*)', 'location/(.*)', 'amenity/(.*)', 'booking/(.*)');
   }
 }

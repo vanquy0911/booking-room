@@ -20,11 +20,32 @@ export class AmenityService {
     private readonly organizationMemberRepository: Repository<OrganizationMember>,
   ) { }
 
-  async create(orgId: string, membership: OrganizationMember, dto: CreateAmenityDto) {
-    // 1. Kiểm tra quyền admin
-    if (membership.role !== 'admin') {
-      throw new ForbiddenException('Bạn không có quyền tạo tiện ích');
+  private async getMembership(orgId: string, userId: string) {
+    const membership = await this.organizationMemberRepository.findOne({
+      where: { organizationId: orgId, userId },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException('Bạn không thuộc về tổ chức này');
     }
+
+    return membership;
+  }
+
+  private checkAdmin(
+    membership: OrganizationMember,
+    errorMessage = 'Bạn không có quyền thực hiện thao tác này',
+  ) {
+    if (membership.role !== 'admin') {
+      throw new ForbiddenException(errorMessage);
+    }
+  }
+
+  async create(orgId: string, userId: string, dto: CreateAmenityDto) {
+    const membership = await this.getMembership(orgId, userId);
+    
+    // 1. Kiểm tra quyền admin
+    this.checkAdmin(membership, 'Bạn không có quyền tạo tiện ích');
 
     // 2. Kiểm tra tên tiện ích trùng trong organization
     const existing = await this.amenityRepository.findOne({
@@ -62,20 +83,20 @@ export class AmenityService {
   async update(
     id: string,
     orgId: string,
-    membership: OrganizationMember,
+    userId: string,
     dto: UpdateAmenityDto,
   ) {
-    if (membership.role !== 'admin')
-      throw new ForbiddenException('Bạn không có quyền chỉnh sửa tiện ích');
+    const membership = await this.getMembership(orgId, userId);
+    this.checkAdmin(membership, 'Bạn không có quyền chỉnh sửa tiện ích');
 
     const amenity = await this.findOne(id, orgId);
     Object.assign(amenity, dto);
     return this.amenityRepository.save(amenity);
   }
 
-  async remove(id: string, orgId: string, membership: OrganizationMember) {
-    if (membership.role !== 'admin')
-      throw new ForbiddenException('Bạn không có quyền xóa tiện ích');
+  async remove(id: string, orgId: string, userId: string) {
+    const membership = await this.getMembership(orgId, userId);
+    this.checkAdmin(membership, 'Bạn không có quyền xóa tiện ích');
 
     const amenity = await this.findOne(id, orgId);
     await this.amenityRepository.remove(amenity);

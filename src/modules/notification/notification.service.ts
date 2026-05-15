@@ -1,26 +1,26 @@
-import { Injectable } from '@nestjs/common';
-import { CreateNotificationDto } from './dto/create-notification.dto';
-import { UpdateNotificationDto } from './dto/update-notification.dto';
+import { Injectable, Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
+import { BookingInvitedEvent } from './events/booking-invited.event';
 
 @Injectable()
 export class NotificationService {
-  create(createNotificationDto: CreateNotificationDto) {
-    return 'This action adds a new notification';
-  }
+  private readonly logger = new Logger(NotificationService.name);
 
-  findAll() {
-    return `This action returns all notification`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} notification`;
-  }
-
-  update(id: number, updateNotificationDto: UpdateNotificationDto) {
-    return `This action updates a #${id} notification`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} notification`;
+  @OnEvent('booking.invited', { async: true })
+  async handleBookingInvitedEvent(payload: BookingInvitedEvent) {
+    this.logger.log(`Received booking.invited event for booking ${payload.booking.id}`);
+    
+    const { booking, attendees } = payload;
+    
+    for (const attendee of attendees) {
+      const email = attendee.externalEmail || (attendee.user ? attendee.user.email : null);
+      if (email) {
+        // Thực hiện logic gửi mail tại đây
+        // Ví dụ: await this.mailerService.sendMail({...})
+        this.logger.log(`[Email Simulator] Đã gửi thư mời họp tới email: ${email}`);
+      } else {
+        this.logger.warn(`Không tìm thấy email cho attendee ID: ${attendee.id}`);
+      }
+    }
   }
 }

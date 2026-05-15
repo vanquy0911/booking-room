@@ -1,10 +1,11 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, IsNull, MoreThan, Not, Repository } from 'typeorm';
+import { DataSource, In, IsNull, MoreThan, MoreThanOrEqual, Not, Repository } from 'typeorm';
 import { Room } from './entities/room.entity';
 import { Floor } from '../location/entities/floor.entity';
 import { OrganizationMember } from '../organization/entities/organization_members.entity';
@@ -49,6 +50,18 @@ export class RoomService {
     private readonly maintenanceBlockRepository: Repository<MaintenanceBlock>,
   ) { }
 
+  private async getMembership(orgId: string, userId: string) {
+    const membership = await this.organizationMemberRepository.findOne({
+      where: { organizationId: orgId, userId },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException('Bạn không thuộc về tổ chức này');
+    }
+
+    return membership;
+  }
+
   private checkAdmin(
     membership: OrganizationMember,
     errorMessage = 'Bạn không có quyền thực hiện thao tác này',
@@ -58,7 +71,8 @@ export class RoomService {
     }
   }
 
-  async create(orgId: string, membership: OrganizationMember, dto: CreateRoomDto) {
+  async create(orgId: string, userId: string, dto: CreateRoomDto) {
+    const membership = await this.getMembership(orgId, userId);
     const { amenityIds, ...roomData } = dto;
 
     // 1. Kiểm tra quyền admin
@@ -69,465 +83,275 @@ export class RoomService {
       where: { id: dto.floorId },
       relations: ['location'],
     });
+
     if (!floor || floor.location.organizationId !== orgId) {
-      throw new BadRequestException(
-        'Tầng không tồn tại hoặc không thuộc tổ chức này',
-      );
+      throw new BadRequestException('Floor không tồn tại hoặc không thuộc organization này');
     }
 
-    // 3. Kiểm tra tên phòng trùng
+    // Kiểm tra trùng tên phòng trong cùng floor
     const existingRoom = await this.roomRepository.findOne({
-      where: { floorId: dto.floorId, name: dto.name },
+      where: {
+        organizationId: orgId,
+        floorId: dto.floorId,
+        name: dto.name,
+      },
     });
-    if (existingRoom)
-      throw new BadRequestException('Tên phòng đã tồn tại trong tầng này');
 
-    // 4. Nếu có amenityIds, kiểm tra xem chúng có hợp lệ (thuộc org) không
-    if (amenityIds && amenityIds.length > 0) {
-      const amenitiesCount = await this.amenityRepository.count({
-        where: { id: In(amenityIds), organizationId: orgId },
-      });
-      if (amenitiesCount !== amenityIds.length) {
-        throw new BadRequestException(
-          'Một hoặc nhiều tiện ích không hợp lệ hoặc không thuộc tổ chức này',
-        );
-      }
+    if (existingRoom) {
+      throw new ConflictException(`Phòng với tên "${dto.name}" đã tồn tại trong tầng này`);
     }
 
-    // 5. Thực hiện lưu bằng transaction
+    // 3. Tạo room
+    const room = this.roomRepository.create({
+      ...roomData,
+      organizationId: orgId,
+    });
+
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      const room = this.roomRepository.create({
-        ...roomData,
-        organizationId: orgId,
-      });
       const savedRoom = await queryRunner.manager.save(room);
 
+      // 4. Gắn tiện ích
       if (amenityIds && amenityIds.length > 0) {
         const roomAmenities = amenityIds.map((amenityId) => {
           return queryRunner.manager.create(RoomAmenity, {
             roomId: savedRoom.id,
-            amenityId: amenityId,
+            amenityId,
           });
         });
         await queryRunner.manager.save(roomAmenities);
       }
 
       await queryRunner.commitTransaction();
-      return {
-        message: 'Tạo phòng thành công',
-        data: savedRoom,
-      };
+      return savedRoom;
     } catch (err) {
       await queryRunner.rollbackTransaction();
-      throw new BadRequestException('Lỗi khi tạo phòng: ' + err.message);
+      throw err;
     } finally {
       await queryRunner.release();
     }
-  }
-
-  async uploadPhotos(
-    orgId: string,
-    roomId: string,
-    membership: OrganizationMember,
-    files: Express.Multer.File[],
-  ) {
-    // 1. Kiểm tra quyền admin
-    this.checkAdmin(membership, 'Bạn không có quyền upload ảnh');
-
-    // 2. Kiểm tra room
-    const room = await this.roomRepository.findOne({
-      where: { id: roomId, organizationId: orgId },
-    });
-    if (!room) throw new BadRequestException('Phòng không tồn tại');
-
-    // 3. Kiểm tra số lượng ảnh hiện tại (tối đa 5)
-    const currentPhotosCount = await this.roomPhotoRepository.count({
-      where: { roomId },
-    });
-    if (currentPhotosCount + files.length > 5) {
-      throw new BadRequestException('Mỗi phòng chỉ được có tối đa 5 ảnh');
-    }
-
-    // 4. Upload từng file lên Cloudinary
-    const uploadPromises = files.map(async (file, index) => {
-      const result = await this.cloudinaryService.uploadFile(file);
-
-      const roomPhoto = this.roomPhotoRepository.create({
-        roomId,
-        storageKey: result.public_id,
-        sizeBytes: result.bytes,
-        mimeType: result.format,
-        position: currentPhotosCount + index,
-        uploadedBy: membership.userId,
-      });
-
-      const savedPhoto = await this.roomPhotoRepository.save(roomPhoto);
-
-      // 5. Trigger thumbnail generation (giả lập queue job)
-      this.generateThumbnailBackground(savedPhoto.id, result.public_id);
-
-      return {
-        id: savedPhoto.id,
-        url: result.secure_url,
-        presignedUrl: this.cloudinaryService.generatePresignedUrl(
-          result.public_id,
-        ),
-      };
-    });
-
-    const results = await Promise.all(uploadPromises);
-
-    return {
-      message: 'Upload ảnh thành công',
-      data: results,
-    };
-  }
-
-  private async generateThumbnailBackground(photoId: string, publicId: string) {
-    // Giả lập background job (trong thực tế dùng Bull/BullMQ)
-    setTimeout(async () => {
-      // Cloudinary tự động tạo thumbnail qua transformation, ở đây ta chỉ cần lưu key
-      const thumbnailKey = `w_256,h_256,c_fill/${publicId}`;
-      await this.roomPhotoRepository.update(photoId, { thumbnailKey });
-    }, 2000);
   }
 
   async findAll(orgId: string, amenities?: string) {
     const queryBuilder = this.roomRepository
       .createQueryBuilder('room')
       .leftJoinAndSelect('room.floor', 'floor')
-      .leftJoinAndSelect('room.organization', 'organization')
+      .leftJoinAndSelect('floor.location', 'location')
+      .leftJoinAndSelect('room.roomAmenities', 'roomAmenities')
+      .leftJoinAndSelect('roomAmenities.amenity', 'amenity')
       .leftJoinAndSelect('room.photos', 'photos')
       .where('room.organizationId = :orgId', { orgId });
 
     if (amenities) {
       const amenityNames = amenities.split(',').map((a) => a.trim());
-
-      // AND logic: Phòng phải có TẤT CẢ các tiện ích này
-      queryBuilder
-        .innerJoin('room_amenities', 'ra', 'ra.room_id = room.id')
-        .innerJoin('amenities', 'am', 'am.id = ra.amenity_id')
-        .andWhere('am.name IN (:...amenityNames)', { amenityNames })
-        .groupBy('room.id')
-        .addGroupBy('floor.id')
-        .addGroupBy('organization.id')
-        .having('COUNT(DISTINCT am.name) = :count', {
-          count: amenityNames.length,
-        });
+      queryBuilder.andWhere('amenity.name IN (:...amenityNames)', { amenityNames });
     }
 
-    const rooms = await queryBuilder.getMany();
-
-    // Map lại để lấy presigned URL cho ảnh
-    return rooms.map((room) => ({
-      ...room,
-      photos: room.photos?.map((p) => ({
-        ...p,
-        url: this.cloudinaryService.generatePresignedUrl(p.storageKey),
-      })),
-    }));
+    return queryBuilder.getMany();
   }
 
   async findAvailableRooms(orgId: string, dto: FindAvailableRoomsDto) {
-    const { startTime, endTime, capacity, amenities } = dto;
-    const range = `[${startTime}, ${endTime}]`;
+    const { startTime, endTime, capacity = 0 } = dto;
 
-    const queryBuilder = this.roomRepository
-      .createQueryBuilder('room')
-      .leftJoinAndSelect('room.floor', 'floor')
-      .leftJoinAndSelect('room.photos', 'photos')
-      .where('room.organizationId = :orgId', { orgId })
-      .andWhere('room.isActive = true');
-
-    if (capacity) {
-      queryBuilder.andWhere('room.capacity >= :capacity', { capacity });
-    }
-
-    // 1. Loại bỏ các phòng đã có Booking trùng lịch (Overlap)
-    queryBuilder.andWhere((qb) => {
-      const subQuery = qb
-        .subQuery()
-        .select('1')
-        .from(Booking, 'booking')
-        .where('booking.roomId = room.id')
-        .andWhere('booking.status IN (:...statuses)', {
-          statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED],
-        })
-        .andWhere('booking.time_range && :range', { range })
-        .getQuery();
-      return `NOT EXISTS ${subQuery}`;
-    });
-
-    // 2. Loại bỏ các phòng đang bảo trì trùng lịch
-    queryBuilder.andWhere((qb) => {
-      const subQuery = qb
-        .subQuery()
-        .select('1')
-        .from(MaintenanceBlock, 'mb')
-        .where('mb.roomId = room.id')
-        .andWhere('mb.time_range && :range', { range })
-        .getQuery();
-      return `NOT EXISTS ${subQuery}`;
-    });
-
-    // 3. Lọc theo tiện ích (AND logic) - Sử dụng Subquery để tránh lỗi GROUP BY với các bảng Join khác
-    if (amenities) {
-      const amenityNames = amenities.split(',').map((a) => a.trim());
-      queryBuilder.andWhere((qb) => {
-        const subQuery = qb
-          .subQuery()
-          .select('ra.room_id')
-          .from('room_amenities', 'ra')
-          .innerJoin('amenities', 'am', 'am.id = ra.amenity_id')
-          .where('am.name IN (:...amenityNames)', { amenityNames })
-          .groupBy('ra.room_id')
-          .having('COUNT(DISTINCT am.name) = :count', {
-            count: amenityNames.length,
-          })
-          .getQuery();
-        return `room.id IN ${subQuery}`;
-      });
-    }
-
-    const rooms = await queryBuilder.getMany();
-
-    // 4. Kiểm tra các quy tắc lặp lại (RRULE) của lịch bảo trì
-    const recurringBlocks = await this.maintenanceBlockRepository.find({
+    // 1. Lấy tất cả phòng trong org thỏa mãn capacity
+    const rooms = await this.roomRepository.find({
       where: {
-        room: { organizationId: orgId },
-        rule: Not(IsNull()),
+        organizationId: orgId,
+        isActive: true,
+        capacity: MoreThanOrEqual(capacity),
       },
+      relations: ['floor', 'floor.location', 'roomAmenities', 'roomAmenities.amenity', 'photos'],
     });
 
-    const availableRooms = rooms.filter((room) => {
-      const roomBlocks = recurringBlocks.filter((b) => b.roomId === room.id);
-      
-      for (const block of roomBlocks) {
-        if (isRRuleOverlapping(block.rule, new Date(startTime), new Date(endTime))) {
-          return false;
-        }
-      }
-      return true;
-    });
-
-    // 5. Lấy thêm thông tin booking gần nhất cho mỗi phòng để hiển thị bối cảnh
-    return Promise.all(
-      availableRooms.map(async (room) => {
-        const nearestBooking = await this.bookingRepository
-          .createQueryBuilder('b')
-          .where('b.roomId = :roomId', { roomId: room.id })
-          .andWhere('b.status IN (:...statuses)', {
-            statuses: [BookingStatus.CONFIRMED],
-          })
-          // Tìm booking có thời gian gần nhất với mốc bắt đầu yêu cầu
-          .orderBy(
-            'ABS(EXTRACT(EPOCH FROM (lower(b.time_range) - :start::timestamp)))',
-            'ASC',
-          )
-          .setParameter('start', startTime)
-          .limit(1)
-          .getOne();
-
-        return {
-          ...room,
-          nearestBooking,
-          photos: room.photos?.map((p) => ({
-            ...p,
-            url: this.cloudinaryService.generatePresignedUrl(p.storageKey),
-          })),
-        };
-      }),
-    );
-  }
-
-  async update(
-    orgId: string,
-    roomId: string,
-    membership: OrganizationMember,
-    dto: UpdateRoomDto,
-  ) {
-    const { amenityIds, ...roomData } = dto;
-
-    // 1. Kiểm tra quyền admin
-    this.checkAdmin(membership, 'Bạn không có quyền chỉnh sửa phòng');
-
-    // 2. Kiểm tra room tồn tại
-    const room = await this.roomRepository.findOne({
-      where: { id: roomId, organizationId: orgId },
-    });
-    if (!room) throw new BadRequestException('Phòng không tồn tại');
-
-    // 3. Nếu có đổi floorId, kiểm tra floorId mới
-    if (dto.floorId && dto.floorId !== room.floorId) {
-      const floor = await this.floorRepository.findOne({
-        where: { id: dto.floorId },
-        relations: ['location'],
-      });
-      if (!floor || floor.location.organizationId !== orgId) {
-        throw new BadRequestException(
-          'Tầng mới không hợp lệ hoặc không thuộc tổ chức này',
-        );
-      }
-    }
-
-    // 4. Nếu đổi tên hoặc đổi tầng, kiểm tra trùng tên
-    if (dto.name || dto.floorId) {
-      const targetName = dto.name || room.name;
-      const targetFloorId = dto.floorId || room.floorId;
-
-      const existingRoom = await this.roomRepository.findOne({
-        where: { floorId: targetFloorId, name: targetName },
-      });
-
-      if (existingRoom && existingRoom.id !== roomId) {
-        throw new BadRequestException('Tên phòng đã tồn tại trong tầng này');
-      }
-    }
-
-    // 5. Nếu có amenityIds, kiểm tra tính hợp lệ
-    if (amenityIds && amenityIds.length > 0) {
-      const amenitiesCount = await this.amenityRepository.count({
-        where: { id: In(amenityIds), organizationId: orgId },
-      });
-      if (amenitiesCount !== amenityIds.length) {
-        throw new BadRequestException('Một hoặc nhiều tiện ích không hợp lệ');
-      }
-    }
-
-    // 6. Thực hiện update bằng transaction
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      Object.assign(room, roomData);
-      const updatedRoom = await queryRunner.manager.save(room);
-
-      if (amenityIds !== undefined) {
-        await queryRunner.manager.delete(RoomAmenity, { roomId });
-        if (amenityIds.length > 0) {
-          const roomAmenities = amenityIds.map((amenityId) => {
-            return queryRunner.manager.create(RoomAmenity, {
-              roomId,
-              amenityId,
-            });
-          });
-          await queryRunner.manager.save(roomAmenities);
-        }
-      }
-
-      await queryRunner.commitTransaction();
-      return {
-        message: 'Cập nhật phòng thành công',
-        data: updatedRoom,
-      };
-    } catch (err) {
-      await queryRunner.rollbackTransaction();
-      throw new BadRequestException('Lỗi khi cập nhật: ' + err.message);
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
-  async remove(orgId: string, roomId: string, membership: OrganizationMember) {
-    // 1. Kiểm tra quyền admin
-    this.checkAdmin(membership, 'Bạn không có quyền xóa phòng');
-
-    // 2. Kiểm tra room tồn tại
-    const room = await this.roomRepository.findOne({
-      where: { id: roomId, organizationId: orgId },
-    });
-    if (!room) throw new BadRequestException('Phòng không tồn tại');
-
-    // 3. Kiểm tra các booking tương lai
-    const futureBookings = await this.bookingRepository
-      .createQueryBuilder('booking')
-      .where('booking.roomId = :roomId', { roomId })
-      .andWhere('upper(booking.time_range) > NOW()')
-      .andWhere('booking.status IN (:...statuses)', {
-        statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED],
+    // 2. Lấy danh sách booking overlap
+    const overlappingBookings = await this.bookingRepository.createQueryBuilder('booking')
+      .where('booking.organizationId = :orgId', { orgId })
+      .andWhere('booking.status NOT IN (:...statuses)', {
+        statuses: [BookingStatus.CANCELLED, BookingStatus.REJECTED]
+      })
+      .andWhere('booking.timeRange && tstzrange(:startTime, :endTime, \'[]\')', {
+        startTime,
+        endTime,
       })
       .getMany();
 
+    const bookedRoomIds = overlappingBookings.map(b => b.roomId);
+
+    // 3. Lấy danh sách maintenance blocks overlap
+    const overlappingMaintenance = await this.maintenanceBlockRepository.createQueryBuilder('block')
+      .where('block.timeRange && tstzrange(:startTime, :endTime, \'[]\')', {
+        startTime,
+        endTime,
+      })
+      .getMany();
+
+    const maintenanceRoomIds = overlappingMaintenance.map(m => m.roomId);
+
+    // 4. Filter
+    return rooms.filter(room =>
+      !bookedRoomIds.includes(room.id) &&
+      !maintenanceRoomIds.includes(room.id)
+    );
+  }
+
+  async uploadPhotos(orgId: string, roomId: string, userId: string, files: Express.Multer.File[]) {
+    const membership = await this.getMembership(orgId, userId);
+    this.checkAdmin(membership, 'Bạn không có quyền upload ảnh');
+
+    const room = await this.roomRepository.findOne({
+      where: { id: roomId, organizationId: orgId },
+      relations: ['photos'],
+    });
+
+    if (!room) throw new BadRequestException('Phòng không tồn tại');
+    if (room.photos.length + files.length > 5) {
+      throw new BadRequestException('Tối đa 5 ảnh cho mỗi phòng');
+    }
+
+    const uploadPromises = files.map(file => this.cloudinaryService.uploadFile(file, 'rooms'));
+    const uploadResults = await Promise.all(uploadPromises);
+
+    const roomPhotos = uploadResults.map(res => this.roomPhotoRepository.create({
+      roomId: room.id,
+      storageKey: res.secure_url || res.url,
+      sizeBytes: res.bytes,
+      mimeType: res.resource_type + '/' + res.format,
+      uploadedBy: userId,
+    }));
+
+    return this.roomPhotoRepository.save(roomPhotos);
+  }
+
+  async update(orgId: string, roomId: string, userId: string, dto: UpdateRoomDto) {
+    const membership = await this.getMembership(orgId, userId);
+    this.checkAdmin(membership, 'Bạn không có quyền cập nhật phòng');
+
+    const room = await this.roomRepository.findOne({
+      where: { id: roomId, organizationId: orgId },
+    });
+
+    if (!room) throw new BadRequestException('Phòng không tồn tại');
+
+    const { amenityIds, ...roomData } = dto;
+
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      if (futureBookings.length > 0) {
-        // Hủy tất cả booking tương lai
-        await queryRunner.manager.update(
-          Booking,
-          { id: In(futureBookings.map((b) => b.id)) },
-          {
-            status: BookingStatus.CANCELLED,
-            cancelReason: 'Phòng đã bị xóa khỏi hệ thống',
-            cancelledBy: membership.userId,
-            cancelledAt: new Date(),
-          },
-        );
+      // Update room info
+      await queryRunner.manager.update(Room, roomId, roomData);
+
+      // Update amenities if provided
+      if (amenityIds) {
+        await queryRunner.manager.delete(RoomAmenity, { roomId });
+        const roomAmenities = amenityIds.map(amenityId => queryRunner.manager.create(RoomAmenity, {
+          roomId,
+          amenityId,
+        }));
+        await queryRunner.manager.save(roomAmenities);
       }
 
-      // Xóa mềm phòng
-      await queryRunner.manager.softRemove(room);
-
       await queryRunner.commitTransaction();
-      return {
-        message: 'Xóa phòng thành công',
-        cancelledBookings: futureBookings.length,
-      };
+      return this.roomRepository.findOne({
+        where: { id: roomId },
+        relations: ['roomAmenities', 'roomAmenities.amenity'],
+      });
     } catch (err) {
       await queryRunner.rollbackTransaction();
-      throw new BadRequestException('Lỗi khi xóa phòng: ' + err.message);
+      throw err;
     } finally {
       await queryRunner.release();
     }
   }
 
-  // Hàm tạo block bảo trì
-  async createMaintenanceBlock(orgId: string, roomId: string, membership: OrganizationMember, dto: CreateMaintenanceBlockDto) {
+  async remove(orgId: string, roomId: string, userId: string) {
+    const membership = await this.getMembership(orgId, userId);
+    this.checkAdmin(membership, 'Bạn không có quyền xóa phòng');
+
+    const room = await this.roomRepository.findOne({
+      where: { id: roomId, organizationId: orgId },
+    });
+
+    if (!room) throw new BadRequestException('Phòng không tồn tại');
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Soft cancel all future bookings
+      await queryRunner.manager.update(Booking,
+        {
+          roomId,
+          status: In([BookingStatus.PENDING, BookingStatus.CONFIRMED]),
+        },
+        {
+          status: BookingStatus.CANCELLED,
+          cancelReason: 'Phòng đã bị xóa khỏi hệ thống',
+          cancelledAt: new Date(),
+          cancelledBy: userId,
+        }
+      );
+
+      // Soft delete room
+      await queryRunner.manager.softDelete(Room, roomId);
+
+      await queryRunner.commitTransaction();
+      return { message: 'Xóa phòng thành công' };
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async createMaintenanceBlock(orgId: string, roomId: string, userId: string, dto: CreateMaintenanceBlockDto) {
+    const membership = await this.getMembership(orgId, userId);
     this.checkAdmin(membership, 'Bạn không có quyền tạo lịch bảo trì');
 
     const room = await this.roomRepository.findOne({
       where: { id: roomId, organizationId: orgId },
     });
+
     if (!room) throw new BadRequestException('Phòng không tồn tại');
 
+    const { startTime, endTime, reason } = dto;
+
     const block = this.maintenanceBlockRepository.create({
-      ...dto,
       roomId,
-      createdBy: membership.userId,
+      timeRange: `[${startTime}, ${endTime}]`,
+      reason,
     });
+
     return this.maintenanceBlockRepository.save(block);
   }
 
-  // Hàm lấy danh sách block của 1 phòng
-  async findAllMaintenanceBlocks(orgId: string, roomId: string, membership: OrganizationMember) {
+  async findAllMaintenanceBlocks(orgId: string, roomId: string, userId: string) {
+    const membership = await this.getMembership(orgId, userId);
     this.checkAdmin(membership, 'Bạn không có quyền xem lịch bảo trì');
 
     return this.maintenanceBlockRepository.find({
-      where: { roomId, room: { organizationId: orgId } },
-      relations: ['creator'],
+      where: { roomId },
+      order: { createdAt: 'DESC' },
     });
   }
 
-  // Hàm xóa lịch bảo trì
-  async removeMaintenanceBlock(orgId: string, blockId: string, membership: OrganizationMember) {
+  async removeMaintenanceBlock(orgId: string, blockId: string, userId: string) {
+    const membership = await this.getMembership(orgId, userId);
     this.checkAdmin(membership, 'Bạn không có quyền xóa lịch bảo trì');
 
     const block = await this.maintenanceBlockRepository.findOne({
-      where: { id: blockId, room: { organizationId: orgId } },
+      where: { id: blockId },
     });
 
-    if (!block) {
-      throw new BadRequestException('Lịch bảo trì không tồn tại hoặc không thuộc tổ chức này');
-    }
+    if (!block) throw new BadRequestException('Block bảo trì không tồn tại');
 
-    await this.maintenanceBlockRepository.remove(block);
+    await this.maintenanceBlockRepository.delete(blockId);
     return { message: 'Xóa lịch bảo trì thành công' };
   }
 }

@@ -28,8 +28,21 @@ export class LocationService {
     private readonly organizationMemberRepository: Repository<OrganizationMember>,
   ) { }
 
-  async create(orgId: string, membership: OrganizationMember, dto: CreateLocationDto) {
-    // Generate slug từ name
+  private async getMembership(orgId: string, userId: string) {
+    const membership = await this.organizationMemberRepository.findOne({
+      where: { organizationId: orgId, userId },
+      relations: ['organization'],
+    });
+
+    if (!membership) {
+      throw new ForbiddenException('Bạn không thuộc về tổ chức này');
+    }
+
+    return membership;
+  }
+
+  async create(orgId: string, userId: string, dto: CreateLocationDto) {
+    const membership = await this.getMembership(orgId, userId);
 
     // Generate slug từ name
     const slug = slugify(dto.name, {
@@ -55,7 +68,6 @@ export class LocationService {
       name: dto.name,
       slug,
       timezone: membership.organization?.defaultTimezone || 'UTC',
-
       organizationId: orgId,
       address: dto.address,
     });
@@ -72,9 +84,10 @@ export class LocationService {
   async createFloor(
     locationId: string,
     orgId: string,
-    membership: OrganizationMember,
+    userId: string,
     dto: CreateFloorDto,
   ) {
+    await this.getMembership(orgId, userId);
 
     // Kiểm tra xem location có tồn tại và thuộc org này không
     const location = await this.locationRepository.findOne({
@@ -100,13 +113,6 @@ export class LocationService {
       message: 'Tạo floor thành công',
       data: savedFloor,
     };
-  }
-
-  // check quyền trong organization
-  private checkOrgMembership(membership: OrganizationMember) {
-    if (!membership)
-      throw new ForbiddenException('Bạn không thuộc organization này');
-    return membership;
   }
 
   async findAllLocations(orgId: string) {
