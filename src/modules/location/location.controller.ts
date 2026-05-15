@@ -20,7 +20,7 @@ import { User } from '../../commons/decorators/user.decorator';
 @ApiTags('location')
 @Controller('location')
 export class LocationController {
-  constructor(private readonly locationService: LocationService) { }
+  constructor(private readonly locationService: LocationService) {}
 
   @Post(':orgId')
   @ApiOperation({ summary: 'Tạo location mới cho một tổ chức' })
@@ -114,11 +114,7 @@ export class LocationController {
     @Param('locationId') locationId: string,
     @Param('floorId') floorId: string,
   ) {
-    return this.locationService.findOneFloor(
-      floorId,
-      locationId,
-      orgId,
-    );
+    return this.locationService.findOneFloor(floorId, locationId, orgId);
   }
 
   @Patch(':orgId/floor/:locationId/:floorId')
@@ -131,12 +127,7 @@ export class LocationController {
     @Param('floorId') floorId: string,
     @Body() dto: UpdateFloorDto,
   ) {
-    return this.locationService.updateFloor(
-      floorId,
-      locationId,
-      orgId,
-      dto,
-    );
+    return this.locationService.updateFloor(floorId, locationId, orgId, dto);
   }
 
   @Delete(':orgId/floor/:locationId/:floorId')

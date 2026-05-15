@@ -46,13 +46,9 @@ export class BookingService {
 
     private readonly eventEmitter: EventEmitter2,
     private readonly dataSource: DataSource,
-  ) { }
+  ) {}
 
-  async create(
-    orgId: string,
-    userId: string,
-    dto: CreateBookingDto,
-  ) {
+  async create(orgId: string, userId: string, dto: CreateBookingDto) {
     const { roomId, startTime, endTime, title, description, attendees } = dto;
 
     // 1. Lấy thông tin phòng và tổ chức
@@ -154,7 +150,11 @@ export class BookingService {
       const savedBooking = await queryRunner.manager.save(booking);
 
       if (attendees && attendees.length > 0) {
-        await this.processInvitations(savedBooking, attendees, queryRunner.manager);
+        await this.processInvitations(
+          savedBooking,
+          attendees,
+          queryRunner.manager,
+        );
       }
 
       await queryRunner.commitTransaction();
@@ -253,7 +253,6 @@ export class BookingService {
     queryBuilder.addOrderBy('booking.id', order);
     queryBuilder.take(limit + 1);
 
-
     const results = await queryBuilder.getMany();
     const hasNextPage = results.length > limit;
     const data = hasNextPage ? results.slice(0, limit) : results;
@@ -281,13 +280,7 @@ export class BookingService {
   async findOne(orgId: string, id: string) {
     const booking = await this.bookingRepository.findOne({
       where: { id, organizationId: orgId },
-      relations: [
-        'room',
-        'creator',
-        'attendees',
-        'attendees.user',
-        'approver',
-      ],
+      relations: ['room', 'creator', 'attendees', 'attendees.user', 'approver'],
     });
 
     if (!booking) {
@@ -323,8 +316,16 @@ export class BookingService {
       throw new ForbiddenException('Bạn không có quyền hủy đặt phòng này');
     }
 
-    if ([BookingStatus.CANCELLED, BookingStatus.REJECTED, BookingStatus.COMPLETED].includes(booking.status)) {
-      throw new BadRequestException(`Không thể hủy đặt phòng đang ở trạng thái ${booking.status}`);
+    if (
+      [
+        BookingStatus.CANCELLED,
+        BookingStatus.REJECTED,
+        BookingStatus.COMPLETED,
+      ].includes(booking.status)
+    ) {
+      throw new BadRequestException(
+        `Không thể hủy đặt phòng đang ở trạng thái ${booking.status}`,
+      );
     }
 
     booking.status = BookingStatus.CANCELLED;
@@ -343,7 +344,9 @@ export class BookingService {
 
     if (!booking) throw new NotFoundException('Booking không tồn tại');
 
-    if ([BookingStatus.CANCELLED, BookingStatus.REJECTED].includes(booking.status)) {
+    if (
+      [BookingStatus.CANCELLED, BookingStatus.REJECTED].includes(booking.status)
+    ) {
       throw new BadRequestException('Booking đã bị hủy hoặc từ chối');
     }
 
@@ -364,7 +367,9 @@ export class BookingService {
     const diffMinutes = now.diff(startTime, 'minute');
 
     if (diffMinutes < -5 || diffMinutes > 15) {
-      throw new BadRequestException('Ngoài thời gian cho phép check-in (5p trước đến 15p sau giờ bắt đầu)');
+      throw new BadRequestException(
+        'Ngoài thời gian cho phép check-in (5p trước đến 15p sau giờ bắt đầu)',
+      );
     }
 
     booking.status = BookingStatus.IN_PROGRESS;
@@ -374,7 +379,12 @@ export class BookingService {
     return this.bookingRepository.save(booking);
   }
 
-  async inviteAttendees(orgId: string, userId: string, bookingId: string, dto: InviteAttendeesDto) {
+  async inviteAttendees(
+    orgId: string,
+    userId: string,
+    bookingId: string,
+    dto: InviteAttendeesDto,
+  ) {
     const booking = await this.bookingRepository.findOne({
       where: { id: bookingId, organizationId: orgId },
     });
@@ -384,7 +394,9 @@ export class BookingService {
     }
 
     if (booking.createdBy !== userId) {
-      throw new ForbiddenException('Bạn không có quyền mời người khác vào phòng họp này');
+      throw new ForbiddenException(
+        'Bạn không có quyền mời người khác vào phòng họp này',
+      );
     }
 
     const newAttendees = await this.processInvitations(booking, dto.attendees);
@@ -416,12 +428,16 @@ export class BookingService {
     }
 
     if (!isCreator && !isAdmin) {
-      throw new ForbiddenException('Chỉ người tạo hoặc Admin mới có quyền kết thúc phòng họp sớm');
+      throw new ForbiddenException(
+        'Chỉ người tạo hoặc Admin mới có quyền kết thúc phòng họp sớm',
+      );
     }
 
     // 2. Chỉ end khi booking đang hoạt động (đã check-in)
     if (booking.status !== BookingStatus.IN_PROGRESS) {
-      throw new BadRequestException('Chỉ có thể kết thúc sớm các cuộc họp đang diễn ra (đã check-in)');
+      throw new BadRequestException(
+        'Chỉ có thể kết thúc sớm các cuộc họp đang diễn ra (đã check-in)',
+      );
     }
 
     // 3. Cập nhật lại timeRange để nhả slot
@@ -430,7 +446,9 @@ export class BookingService {
 
     // Đảm bảo thời gian kết thúc mới không sớm hơn thời gian bắt đầu
     if (dayjs().isBefore(dayjs(startTimeStr))) {
-      throw new BadRequestException('Không thể kết thúc cuộc họp trước khi nó bắt đầu');
+      throw new BadRequestException(
+        'Không thể kết thúc cuộc họp trước khi nó bắt đầu',
+      );
     }
 
     booking.timeRange = `[${startTimeStr}, ${now}]`;
@@ -451,15 +469,19 @@ export class BookingService {
   ) {
     if (!attendeesDto || attendeesDto.length === 0) return [];
 
-    const repo = manager ? manager.getRepository(BookingAttendee) : this.attendeeRepository;
+    const repo = manager
+      ? manager.getRepository(BookingAttendee)
+      : this.attendeeRepository;
 
-    const existingAttendees = await repo.find({ where: { bookingId: booking.id } });
+    const existingAttendees = await repo.find({
+      where: { bookingId: booking.id },
+    });
 
     const uniqueNewAttendees = attendeesDto.filter((dto) => {
       const isExist = existingAttendees.some(
         (exist) =>
           (dto.userId && exist.userId === dto.userId) ||
-          (dto.email && exist.externalEmail === dto.email)
+          (dto.email && exist.externalEmail === dto.email),
       );
       return !isExist;
     });
@@ -467,7 +489,9 @@ export class BookingService {
     if (uniqueNewAttendees.length === 0) return [];
 
     if (existingAttendees.length + uniqueNewAttendees.length > 50) {
-      throw new BadRequestException('Một phòng họp chỉ được mời tối đa 50 người');
+      throw new BadRequestException(
+        'Một phòng họp chỉ được mời tối đa 50 người',
+      );
     }
 
     const newAttendees = uniqueNewAttendees.map((attr) => {

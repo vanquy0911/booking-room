@@ -24,4 +24,4 @@ import { BookingSeries } from './entities/booking_series.entity';
   controllers: [BookingController],
   providers: [BookingService],
 })
-export class BookingModule { }
+export class BookingModule {}

@@ -32,7 +32,7 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 @ApiTags('room')
 @Controller('room')
 export class RoomController {
-  constructor(private readonly roomService: RoomService) { }
+  constructor(private readonly roomService: RoomService) {}
 
   @Post(':orgId')
   @ApiOperation({ summary: 'Tạo phòng mới' })
@@ -91,7 +91,6 @@ export class RoomController {
       },
     },
   })
-
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   @UseInterceptors(

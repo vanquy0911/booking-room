@@ -1,10 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { v2 as cloudinary, UploadApiResponse, UploadApiErrorResponse } from 'cloudinary';
+import {
+  v2 as cloudinary,
+  UploadApiResponse,
+  UploadApiErrorResponse,
+} from 'cloudinary';
 import * as streamifier from 'streamifier';
 
 @Injectable()
 export class CloudinaryService {
-  async uploadFile(file: Express.Multer.File, folder = 'booking_room'): Promise<UploadApiResponse | UploadApiErrorResponse> {
+  async uploadFile(
+    file: Express.Multer.File,
+    folder = 'booking_room',
+  ): Promise<UploadApiResponse | UploadApiErrorResponse> {
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
@@ -13,7 +20,9 @@ export class CloudinaryService {
         (error, result) => {
           if (error) return reject(error);
           if (!result) {
-            return reject(new Error('Cloudinary upload failed: No result received'));
+            return reject(
+              new Error('Cloudinary upload failed: No result received'),
+            );
           }
           resolve(result);
         },

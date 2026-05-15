@@ -5,7 +5,15 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, IsNull, MoreThan, MoreThanOrEqual, Not, Repository } from 'typeorm';
+import {
+  DataSource,
+  In,
+  IsNull,
+  MoreThan,
+  MoreThanOrEqual,
+  Not,
+  Repository,
+} from 'typeorm';
 import { Room } from './entities/room.entity';
 import { Floor } from '../location/entities/floor.entity';
 import { OrganizationMember } from '../organization/entities/organization_members.entity';
@@ -19,7 +27,6 @@ import { CloudinaryService } from '../../commons/cloudinary/cloudinary.service';
 import { Booking, BookingStatus } from '../booking/entities/booking.entity';
 import { MaintenanceBlock } from './entities/maintenance_blocks.entity';
 import { FindAvailableRoomsDto } from './dto/find-available-rooms.dto';
-import { isRRuleOverlapping } from '../../commons/utils/rrule.util';
 
 @Injectable()
 export class RoomService {
@@ -48,7 +55,7 @@ export class RoomService {
 
     @InjectRepository(MaintenanceBlock)
     private readonly maintenanceBlockRepository: Repository<MaintenanceBlock>,
-  ) { }
+  ) {}
 
   private async getMembership(orgId: string, userId: string) {
     const membership = await this.organizationMemberRepository.findOne({
@@ -85,7 +92,9 @@ export class RoomService {
     });
 
     if (!floor || floor.location.organizationId !== orgId) {
-      throw new BadRequestException('Floor không tồn tại hoặc không thuộc organization này');
+      throw new BadRequestException(
+        'Floor không tồn tại hoặc không thuộc organization này',
+      );
     }
 
     // Kiểm tra trùng tên phòng trong cùng floor
@@ -98,7 +107,9 @@ export class RoomService {
     });
 
     if (existingRoom) {
-      throw new ConflictException(`Phòng với tên "${dto.name}" đã tồn tại trong tầng này`);
+      throw new ConflictException(
+        `Phòng với tên "${dto.name}" đã tồn tại trong tầng này`,
+      );
     }
 
     // 3. Tạo room
@@ -147,7 +158,9 @@ export class RoomService {
 
     if (amenities) {
       const amenityNames = amenities.split(',').map((a) => a.trim());
-      queryBuilder.andWhere('amenity.name IN (:...amenityNames)', { amenityNames });
+      queryBuilder.andWhere('amenity.name IN (:...amenityNames)', {
+        amenityNames,
+      });
     }
 
     return queryBuilder.getMany();
@@ -163,41 +176,55 @@ export class RoomService {
         isActive: true,
         capacity: MoreThanOrEqual(capacity),
       },
-      relations: ['floor', 'floor.location', 'roomAmenities', 'roomAmenities.amenity', 'photos'],
+      relations: [
+        'floor',
+        'floor.location',
+        'roomAmenities',
+        'roomAmenities.amenity',
+        'photos',
+      ],
     });
 
     // 2. Lấy danh sách booking overlap
-    const overlappingBookings = await this.bookingRepository.createQueryBuilder('booking')
+    const overlappingBookings = await this.bookingRepository
+      .createQueryBuilder('booking')
       .where('booking.organizationId = :orgId', { orgId })
       .andWhere('booking.status NOT IN (:...statuses)', {
-        statuses: [BookingStatus.CANCELLED, BookingStatus.REJECTED]
+        statuses: [BookingStatus.CANCELLED, BookingStatus.REJECTED],
       })
-      .andWhere('booking.timeRange && tstzrange(:startTime, :endTime, \'[]\')', {
+      .andWhere("booking.timeRange && tstzrange(:startTime, :endTime, '[]')", {
         startTime,
         endTime,
       })
       .getMany();
 
-    const bookedRoomIds = overlappingBookings.map(b => b.roomId);
+    const bookedRoomIds = overlappingBookings.map((b) => b.roomId);
 
     // 3. Lấy danh sách maintenance blocks overlap
-    const overlappingMaintenance = await this.maintenanceBlockRepository.createQueryBuilder('block')
-      .where('block.timeRange && tstzrange(:startTime, :endTime, \'[]\')', {
+    const overlappingMaintenance = await this.maintenanceBlockRepository
+      .createQueryBuilder('block')
+      .where("block.timeRange && tstzrange(:startTime, :endTime, '[]')", {
         startTime,
         endTime,
       })
       .getMany();
 
-    const maintenanceRoomIds = overlappingMaintenance.map(m => m.roomId);
+    const maintenanceRoomIds = overlappingMaintenance.map((m) => m.roomId);
 
     // 4. Filter
-    return rooms.filter(room =>
-      !bookedRoomIds.includes(room.id) &&
-      !maintenanceRoomIds.includes(room.id)
+    return rooms.filter(
+      (room) =>
+        !bookedRoomIds.includes(room.id) &&
+        !maintenanceRoomIds.includes(room.id),
     );
   }
 
-  async uploadPhotos(orgId: string, roomId: string, userId: string, files: Express.Multer.File[]) {
+  async uploadPhotos(
+    orgId: string,
+    roomId: string,
+    userId: string,
+    files: Express.Multer.File[],
+  ) {
     const membership = await this.getMembership(orgId, userId);
     this.checkAdmin(membership, 'Bạn không có quyền upload ảnh');
 
@@ -211,21 +238,30 @@ export class RoomService {
       throw new BadRequestException('Tối đa 5 ảnh cho mỗi phòng');
     }
 
-    const uploadPromises = files.map(file => this.cloudinaryService.uploadFile(file, 'rooms'));
+    const uploadPromises = files.map((file) =>
+      this.cloudinaryService.uploadFile(file, 'rooms'),
+    );
     const uploadResults = await Promise.all(uploadPromises);
 
-    const roomPhotos = uploadResults.map(res => this.roomPhotoRepository.create({
-      roomId: room.id,
-      storageKey: res.secure_url || res.url,
-      sizeBytes: res.bytes,
-      mimeType: res.resource_type + '/' + res.format,
-      uploadedBy: userId,
-    }));
+    const roomPhotos = uploadResults.map((res) =>
+      this.roomPhotoRepository.create({
+        roomId: room.id,
+        storageKey: res.secure_url || res.url,
+        sizeBytes: res.bytes,
+        mimeType: res.resource_type + '/' + res.format,
+        uploadedBy: userId,
+      }),
+    );
 
     return this.roomPhotoRepository.save(roomPhotos);
   }
 
-  async update(orgId: string, roomId: string, userId: string, dto: UpdateRoomDto) {
+  async update(
+    orgId: string,
+    roomId: string,
+    userId: string,
+    dto: UpdateRoomDto,
+  ) {
     const membership = await this.getMembership(orgId, userId);
     this.checkAdmin(membership, 'Bạn không có quyền cập nhật phòng');
 
@@ -248,10 +284,12 @@ export class RoomService {
       // Update amenities if provided
       if (amenityIds) {
         await queryRunner.manager.delete(RoomAmenity, { roomId });
-        const roomAmenities = amenityIds.map(amenityId => queryRunner.manager.create(RoomAmenity, {
-          roomId,
-          amenityId,
-        }));
+        const roomAmenities = amenityIds.map((amenityId) =>
+          queryRunner.manager.create(RoomAmenity, {
+            roomId,
+            amenityId,
+          }),
+        );
         await queryRunner.manager.save(roomAmenities);
       }
 
@@ -284,7 +322,8 @@ export class RoomService {
 
     try {
       // Soft cancel all future bookings
-      await queryRunner.manager.update(Booking,
+      await queryRunner.manager.update(
+        Booking,
         {
           roomId,
           status: In([BookingStatus.PENDING, BookingStatus.CONFIRMED]),
@@ -294,7 +333,7 @@ export class RoomService {
           cancelReason: 'Phòng đã bị xóa khỏi hệ thống',
           cancelledAt: new Date(),
           cancelledBy: userId,
-        }
+        },
       );
 
       // Soft delete room
@@ -310,7 +349,12 @@ export class RoomService {
     }
   }
 
-  async createMaintenanceBlock(orgId: string, roomId: string, userId: string, dto: CreateMaintenanceBlockDto) {
+  async createMaintenanceBlock(
+    orgId: string,
+    roomId: string,
+    userId: string,
+    dto: CreateMaintenanceBlockDto,
+  ) {
     const membership = await this.getMembership(orgId, userId);
     this.checkAdmin(membership, 'Bạn không có quyền tạo lịch bảo trì');
 
@@ -331,7 +375,11 @@ export class RoomService {
     return this.maintenanceBlockRepository.save(block);
   }
 
-  async findAllMaintenanceBlocks(orgId: string, roomId: string, userId: string) {
+  async findAllMaintenanceBlocks(
+    orgId: string,
+    roomId: string,
+    userId: string,
+  ) {
     const membership = await this.getMembership(orgId, userId);
     this.checkAdmin(membership, 'Bạn không có quyền xem lịch bảo trì');
 

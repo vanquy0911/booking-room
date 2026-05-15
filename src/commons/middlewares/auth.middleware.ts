@@ -19,7 +19,7 @@ export class AuthMiddleware implements NestMiddleware {
     private userRepository: Repository<User>,
     @InjectRepository(RefreshToken)
     private refreshTokenRepository: Repository<RefreshToken>,
-  ) { }
+  ) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
     const authHeader = req.headers.authorization;

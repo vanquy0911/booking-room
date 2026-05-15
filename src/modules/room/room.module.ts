@@ -29,4 +29,4 @@ import { MaintenanceBlock } from './entities/maintenance_blocks.entity';
   controllers: [RoomController],
   providers: [RoomService],
 })
-export class RoomModule { }
+export class RoomModule {}

@@ -18,7 +18,7 @@ export class AmenityService {
 
     @InjectRepository(OrganizationMember)
     private readonly organizationMemberRepository: Repository<OrganizationMember>,
-  ) { }
+  ) {}
 
   private async getMembership(orgId: string, userId: string) {
     const membership = await this.organizationMemberRepository.findOne({
@@ -43,7 +43,7 @@ export class AmenityService {
 
   async create(orgId: string, userId: string, dto: CreateAmenityDto) {
     const membership = await this.getMembership(orgId, userId);
-    
+
     // 1. Kiểm tra quyền admin
     this.checkAdmin(membership, 'Bạn không có quyền tạo tiện ích');
 

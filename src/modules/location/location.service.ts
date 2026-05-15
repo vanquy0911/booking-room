@@ -26,7 +26,7 @@ export class LocationService {
 
     @InjectRepository(OrganizationMember)
     private readonly organizationMemberRepository: Repository<OrganizationMember>,
-  ) { }
+  ) {}
 
   private async getMembership(orgId: string, userId: string) {
     const membership = await this.organizationMemberRepository.findOne({
@@ -187,11 +187,7 @@ export class LocationService {
     });
   }
 
-  async findOneFloor(
-    floorId: string,
-    locationId: string,
-    orgId: string,
-  ) {
+  async findOneFloor(floorId: string, locationId: string, orgId: string) {
     const floor = await this.floorRepository.findOne({
       where: { id: floorId, locationId },
     });
@@ -220,11 +216,7 @@ export class LocationService {
     };
   }
 
-  async removeFloor(
-    floorId: string,
-    locationId: string,
-    orgId: string,
-  ) {
+  async removeFloor(floorId: string, locationId: string, orgId: string) {
     const floor = await this.floorRepository.findOne({
       where: { id: floorId, locationId },
     });
