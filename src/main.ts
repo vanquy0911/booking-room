@@ -50,6 +50,19 @@ async function bootstrap() {
     logger: winstonLogger,
   });
 
+  // Cấu hình CORS cho phép Frontend truy cập
+  app.enableCors({
+    origin: true,
+    credentials: true,
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-org-id',
+      'x-tenant-id',
+    ],
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+  });
+
   const config = new DocumentBuilder()
     .setTitle('Booking Room API')
     .setDescription('Booking Room API')
