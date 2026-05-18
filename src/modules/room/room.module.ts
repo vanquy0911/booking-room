@@ -11,6 +11,7 @@ import { RoomPhoto } from './entities/room_photo.entity';
 import { CloudinaryModule } from '../../commons/cloudinary/cloudinary.module';
 import { Booking } from '../booking/entities/booking.entity';
 import { MaintenanceBlock } from './entities/maintenance_blocks.entity';
+import { AuditModule } from '../audit_log/audit.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { MaintenanceBlock } from './entities/maintenance_blocks.entity';
       MaintenanceBlock,
     ]),
     CloudinaryModule,
+    AuditModule,
   ],
   controllers: [RoomController],
   providers: [RoomService],

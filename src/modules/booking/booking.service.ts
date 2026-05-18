@@ -9,18 +9,20 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { Booking, BookingStatus } from './entities/booking.entity';
 import { CreateBookingDto } from './dto/create-booking.dto';
-import { UpdateBookingDto } from './dto/update-booking.dto';
 import { FindBookingsDto, SortOrder } from './dto/find-bookings.dto';
 import { Room } from '../room/entities/room.entity';
 import { Organization } from '../organization/entities/organization.entity';
 import { OrganizationMember } from '../organization/entities/organization_members.entity';
 import { BookingAttendee } from './entities/booking_attendee.entity';
 import { CancelBookingDto } from './dto/cancel-booking.dto';
+import { RejectBookingDto } from './dto/reject-booking.dto';
 import { InviteAttendeesDto } from './dto/invite-attendees.dto';
+import { AuditService } from '../audit_log/audit.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { BookingInvitedEvent } from '../notification/events/booking-invited.event';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
+import { IClientInfo } from '../../commons/decorators/client-info.decorator';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 
 dayjs.extend(isBetween);
@@ -46,9 +48,15 @@ export class BookingService {
 
     private readonly eventEmitter: EventEmitter2,
     private readonly dataSource: DataSource,
-  ) {}
+    private readonly auditService: AuditService,
+  ) { }
 
-  async create(orgId: string, userId: string, dto: CreateBookingDto) {
+  async create(
+    orgId: string,
+    userId: string,
+    dto: CreateBookingDto,
+    clientInfo?: IClientInfo,
+  ) {
     const { roomId, startTime, endTime, title, description, attendees } = dto;
 
     // 1. Lấy thông tin phòng và tổ chức
@@ -158,6 +166,17 @@ export class BookingService {
       }
 
       await queryRunner.commitTransaction();
+
+      await this.auditService.logAction({
+        organizationId: orgId,
+        actorId: userId,
+        action: 'booking.create',
+        entityType: 'booking',
+        entityId: savedBooking.id,
+        ipAddress: clientInfo?.ip,
+        userAgent: clientInfo?.userAgent,
+        metadata: { title: savedBooking.title, status: savedBooking.status },
+      });
 
       return {
         message:
@@ -290,11 +309,108 @@ export class BookingService {
     return booking;
   }
 
+  async getBookingHistory(orgId: string, id: string, userId: string) {
+    const booking = await this.bookingRepository.findOne({
+      where: { id, organizationId: orgId },
+      relations: ['creator', 'approver', 'checkInUser', 'canceller', 'room'],
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Đặt phòng không tồn tại');
+    }
+
+    if (booking.createdBy !== userId) {
+      throw new ForbiddenException(
+        'Bạn không có quyền xem lịch sử thay đổi của đặt phòng này',
+      );
+    }
+
+    const timeline: Array<{
+      event: 'created' | 'approved' | 'rejected' | 'checked_in' | 'cancelled' | 'ended_early';
+      time: Date;
+      actor: { id: string; name: string; email: string } | null;
+      detail: string;
+    }> = [];
+
+    // 1. Tạo đặt phòng 
+    timeline.push({
+      event: 'created',
+      time: booking.createdAt,
+      actor: booking.creator
+        ? { id: booking.creator.id, name: booking.creator.fullName, email: booking.creator.email }
+        : null,
+      detail: 'Khởi tạo yêu cầu đặt phòng họp',
+    });
+
+    // 2. Duyệt hoặc Từ chối (Nếu có)
+    if (booking.approvedAt) {
+      const isApproved = booking.status !== BookingStatus.REJECTED;
+      timeline.push({
+        event: isApproved ? 'approved' : 'rejected',
+        time: booking.approvedAt,
+        actor: booking.approver
+          ? { id: booking.approver.id, name: booking.approver.fullName, email: booking.approver.email }
+          : null,
+        detail: isApproved
+          ? 'Yêu cầu đặt phòng đã được phê duyệt'
+          : `Yêu cầu đặt phòng bị từ chối với lý do: ${booking.rejectionReason || 'Không có lý do'}`,
+      });
+    }
+
+    // 3. Check-in (Nếu có)
+    if (booking.checkedInAt) {
+      timeline.push({
+        event: 'checked_in',
+        time: booking.checkedInAt,
+        actor: booking.checkInUser
+          ? { id: booking.checkInUser.id, name: booking.checkInUser.fullName, email: booking.checkInUser.email }
+          : null,
+        detail: 'Đã check-in điểm danh nhận phòng họp thành công',
+      });
+    }
+
+    // 4. Hủy đặt phòng (Nếu có)
+    if (booking.cancelledAt) {
+      timeline.push({
+        event: 'cancelled',
+        time: booking.cancelledAt,
+        actor: booking.canceller
+          ? { id: booking.canceller.id, name: booking.canceller.fullName, email: booking.canceller.email }
+          : null,
+        detail: `Lịch họp đã bị hủy với lý do: ${booking.cancelReason || 'Không có lý do'}`,
+      });
+    }
+
+    // 5. Kết thúc sớm (Nếu có)
+    if (booking.status === BookingStatus.ENDED_EARLY) {
+      timeline.push({
+        event: 'ended_early',
+        time: booking.updatedAt,
+        actor: booking.creator
+          ? { id: booking.creator.id, name: booking.creator.fullName, email: booking.creator.email }
+          : null,
+        detail: 'Cuộc họp đã được kết thúc sớm để giải phóng slot phòng',
+      });
+    }
+
+    // Sắp xếp theo trình tự thời gian tăng dần
+    timeline.sort((a, b) => a.time.getTime() - b.time.getTime());
+
+    return {
+      bookingId: booking.id,
+      title: booking.title,
+      roomName: booking.room?.name || 'N/A',
+      currentStatus: booking.status,
+      timeline,
+    };
+  }
+
   async cancel(
     orgId: string,
     userId: string,
     id: string,
     dto: CancelBookingDto,
+    clientInfo?: IClientInfo,
   ) {
     const booking = await this.bookingRepository.findOne({
       where: { id, organizationId: orgId },
@@ -333,10 +449,117 @@ export class BookingService {
     booking.cancelledAt = new Date();
     booking.cancelReason = dto.reason;
 
-    return this.bookingRepository.save(booking);
+    const saved = await this.bookingRepository.save(booking);
+
+    await this.auditService.logAction({
+      organizationId: orgId,
+      actorId: userId,
+      action: 'booking.cancel',
+      entityType: 'booking',
+      entityId: booking.id,
+      ipAddress: clientInfo?.ip,
+      userAgent: clientInfo?.userAgent,
+      metadata: { reason: dto.reason },
+    });
+
+    return saved;
   }
 
-  async checkIn(bookingId: string, userId: string) {
+  async approve(
+    orgId: string,
+    userId: string,
+    id: string,
+    clientInfo?: IClientInfo,
+  ) {
+    const booking = await this.bookingRepository.findOne({
+      where: { id, organizationId: orgId },
+    });
+
+    if (!booking) {
+      throw new BadRequestException('Đặt phòng không tồn tại');
+    }
+
+    const membership = await this.organizationMemberRepository.findOne({
+      where: { organizationId: orgId, userId },
+    });
+
+    if (membership?.role !== 'admin') {
+      throw new ForbiddenException('Chỉ Admin mới có quyền duyệt đặt phòng');
+    }
+
+    if (booking.status !== BookingStatus.PENDING) {
+      throw new BadRequestException('Chỉ có thể duyệt các yêu cầu đặt phòng đang chờ (pending)');
+    }
+
+    booking.status = BookingStatus.CONFIRMED;
+    booking.approvedBy = userId;
+    booking.approvedAt = new Date();
+
+    const saved = await this.bookingRepository.save(booking);
+
+    await this.auditService.logAction({
+      organizationId: orgId,
+      actorId: userId,
+      action: 'booking.approve',
+      entityType: 'booking',
+      entityId: booking.id,
+      ipAddress: clientInfo?.ip,
+      userAgent: clientInfo?.userAgent,
+    });
+
+    return saved;
+  }
+
+  async reject(
+    orgId: string,
+    userId: string,
+    id: string,
+    dto: RejectBookingDto,
+    clientInfo?: IClientInfo,
+  ) {
+    const booking = await this.bookingRepository.findOne({
+      where: { id, organizationId: orgId },
+    });
+
+    if (!booking) {
+      throw new BadRequestException('Đặt phòng không tồn tại');
+    }
+
+    const membership = await this.organizationMemberRepository.findOne({
+      where: { organizationId: orgId, userId },
+    });
+
+    if (membership?.role !== 'admin') {
+      throw new ForbiddenException('Chỉ Admin mới có quyền từ chối đặt phòng');
+    }
+
+    if (booking.status !== BookingStatus.PENDING) {
+      throw new BadRequestException('Chỉ có thể từ chối các yêu cầu đặt phòng đang chờ (pending)');
+    }
+
+    booking.status = BookingStatus.REJECTED;
+    booking.approvedBy = userId;
+    booking.approvedAt = new Date();
+    booking.rejectionReason = dto.reason;
+
+    const saved = await this.bookingRepository.save(booking);
+
+    await this.auditService.logAction({
+      organizationId: orgId,
+      actorId: userId,
+      action: 'booking.reject',
+      entityType: 'booking',
+      entityId: booking.id,
+      ipAddress: clientInfo?.ip,
+      userAgent: clientInfo?.userAgent,
+      metadata: { reason: dto.reason },
+    });
+
+    return saved;
+  }
+
+
+  async checkIn(bookingId: string, userId: string, clientInfo?: IClientInfo) {
     const booking = await this.bookingRepository.findOne({
       where: { id: bookingId },
       relations: ['attendees'],
@@ -376,7 +599,19 @@ export class BookingService {
     booking.checkedInAt = new Date();
     booking.checkedInBy = userId;
 
-    return this.bookingRepository.save(booking);
+    const saved = await this.bookingRepository.save(booking);
+
+    await this.auditService.logAction({
+      organizationId: booking.organizationId,
+      actorId: userId,
+      action: 'booking.check_in',
+      entityType: 'booking',
+      entityId: booking.id,
+      ipAddress: clientInfo?.ip,
+      userAgent: clientInfo?.userAgent,
+    });
+
+    return saved;
   }
 
   async inviteAttendees(
@@ -407,7 +642,12 @@ export class BookingService {
     };
   }
 
-  async endEarly(orgId: string, userId: string, bookingId: string) {
+  async endEarly(
+    orgId: string,
+    userId: string,
+    bookingId: string,
+    clientInfo?: IClientInfo,
+  ) {
     const booking = await this.bookingRepository.findOne({
       where: { id: bookingId, organizationId: orgId },
     });
@@ -455,6 +695,16 @@ export class BookingService {
     booking.status = BookingStatus.ENDED_EARLY;
 
     const savedBooking = await this.bookingRepository.save(booking);
+
+    await this.auditService.logAction({
+      organizationId: orgId,
+      actorId: userId,
+      action: 'booking.end_early',
+      entityType: 'booking',
+      entityId: booking.id,
+      ipAddress: clientInfo?.ip,
+      userAgent: clientInfo?.userAgent,
+    });
 
     return {
       message: 'Đã kết thúc phòng họp sớm và giải phóng slot',

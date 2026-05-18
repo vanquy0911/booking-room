@@ -27,12 +27,13 @@ import {
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { User } from '../../commons/decorators/user.decorator';
+import { ClientInfo, IClientInfo } from '../../commons/decorators/client-info.decorator';
 import { FilesInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('room')
 @Controller('room')
 export class RoomController {
-  constructor(private readonly roomService: RoomService) {}
+  constructor(private readonly roomService: RoomService) { }
 
   @Post(':orgId')
   @ApiOperation({ summary: 'Tạo phòng mới' })
@@ -41,9 +42,10 @@ export class RoomController {
   create(
     @Param('orgId') orgId: string,
     @User('id') userId: string,
+    @ClientInfo() clientInfo: IClientInfo,
     @Body() createRoomDto: CreateRoomDto,
   ) {
-    return this.roomService.create(orgId, userId, createRoomDto);
+    return this.roomService.create(orgId, userId, createRoomDto, clientInfo);
   }
 
   @Get(':orgId')
@@ -130,9 +132,10 @@ export class RoomController {
     @Param('orgId') orgId: string,
     @Param('roomId') roomId: string,
     @User('id') userId: string,
+    @ClientInfo() clientInfo: IClientInfo,
     @Body() updateRoomDto: UpdateRoomDto,
   ) {
-    return this.roomService.update(orgId, roomId, userId, updateRoomDto);
+    return this.roomService.update(orgId, roomId, userId, updateRoomDto, clientInfo);
   }
 
   @Delete(':orgId/:roomId')
@@ -143,8 +146,9 @@ export class RoomController {
     @Param('orgId') orgId: string,
     @Param('roomId') roomId: string,
     @User('id') userId: string,
+    @ClientInfo() clientInfo: IClientInfo,
   ) {
-    return this.roomService.remove(orgId, roomId, userId);
+    return this.roomService.remove(orgId, roomId, userId, clientInfo);
   }
 
   @Post(':orgId/:roomId/maintenance-blocks')
@@ -155,9 +159,10 @@ export class RoomController {
     @Param('orgId') orgId: string,
     @Param('roomId') roomId: string,
     @User('id') userId: string,
+    @ClientInfo() clientInfo: IClientInfo,
     @Body() dto: CreateMaintenanceBlockDto,
   ) {
-    return this.roomService.createMaintenanceBlock(orgId, roomId, userId, dto);
+    return this.roomService.createMaintenanceBlock(orgId, roomId, userId, dto, clientInfo);
   }
 
   @Get(':orgId/:roomId/maintenance-blocks')
@@ -180,7 +185,8 @@ export class RoomController {
     @Param('orgId') orgId: string,
     @Param('blockId') blockId: string,
     @User('id') userId: string,
+    @ClientInfo() clientInfo: IClientInfo,
   ) {
-    return this.roomService.removeMaintenanceBlock(orgId, blockId, userId);
+    return this.roomService.removeMaintenanceBlock(orgId, blockId, userId, clientInfo);
   }
 }

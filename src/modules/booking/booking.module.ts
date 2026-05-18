@@ -9,6 +9,7 @@ import { Organization } from '../organization/entities/organization.entity';
 
 import { OrganizationMember } from '../organization/entities/organization_members.entity';
 import { BookingSeries } from './entities/booking_series.entity';
+import { AuditModule } from '../audit_log/audit.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { BookingSeries } from './entities/booking_series.entity';
       Organization,
       OrganizationMember,
     ]),
+    AuditModule,
   ],
   controllers: [BookingController],
   providers: [BookingService],

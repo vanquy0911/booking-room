@@ -27,6 +27,8 @@ import { CloudinaryService } from '../../commons/cloudinary/cloudinary.service';
 import { Booking, BookingStatus } from '../booking/entities/booking.entity';
 import { MaintenanceBlock } from './entities/maintenance_blocks.entity';
 import { FindAvailableRoomsDto } from './dto/find-available-rooms.dto';
+import { AuditService } from '../audit_log/audit.service';
+import { IClientInfo } from '../../commons/decorators/client-info.decorator';
 
 @Injectable()
 export class RoomService {
@@ -55,6 +57,8 @@ export class RoomService {
 
     @InjectRepository(MaintenanceBlock)
     private readonly maintenanceBlockRepository: Repository<MaintenanceBlock>,
+
+    private readonly auditService: AuditService,
   ) {}
 
   private async getMembership(orgId: string, userId: string) {
@@ -78,7 +82,12 @@ export class RoomService {
     }
   }
 
-  async create(orgId: string, userId: string, dto: CreateRoomDto) {
+  async create(
+    orgId: string,
+    userId: string,
+    dto: CreateRoomDto,
+    clientInfo?: IClientInfo,
+  ) {
     const membership = await this.getMembership(orgId, userId);
     const { amenityIds, ...roomData } = dto;
 
@@ -137,6 +146,18 @@ export class RoomService {
       }
 
       await queryRunner.commitTransaction();
+
+      await this.auditService.logAction({
+        organizationId: orgId,
+        actorId: userId,
+        action: 'room.create',
+        entityType: 'room',
+        entityId: savedRoom.id,
+        ipAddress: clientInfo?.ip,
+        userAgent: clientInfo?.userAgent,
+        metadata: { name: savedRoom.name, capacity: savedRoom.capacity },
+      });
+
       return savedRoom;
     } catch (err) {
       await queryRunner.rollbackTransaction();
@@ -261,6 +282,7 @@ export class RoomService {
     roomId: string,
     userId: string,
     dto: UpdateRoomDto,
+    clientInfo?: IClientInfo,
   ) {
     const membership = await this.getMembership(orgId, userId);
     this.checkAdmin(membership, 'Bạn không có quyền cập nhật phòng');
@@ -294,6 +316,18 @@ export class RoomService {
       }
 
       await queryRunner.commitTransaction();
+
+      await this.auditService.logAction({
+        organizationId: orgId,
+        actorId: userId,
+        action: 'room.update',
+        entityType: 'room',
+        entityId: roomId,
+        ipAddress: clientInfo?.ip,
+        userAgent: clientInfo?.userAgent,
+        metadata: { name: room.name, ...roomData },
+      });
+
       return this.roomRepository.findOne({
         where: { id: roomId },
         relations: ['roomAmenities', 'roomAmenities.amenity'],
@@ -306,7 +340,12 @@ export class RoomService {
     }
   }
 
-  async remove(orgId: string, roomId: string, userId: string) {
+  async remove(
+    orgId: string,
+    roomId: string,
+    userId: string,
+    clientInfo?: IClientInfo,
+  ) {
     const membership = await this.getMembership(orgId, userId);
     this.checkAdmin(membership, 'Bạn không có quyền xóa phòng');
 
@@ -340,6 +379,18 @@ export class RoomService {
       await queryRunner.manager.softDelete(Room, roomId);
 
       await queryRunner.commitTransaction();
+
+      await this.auditService.logAction({
+        organizationId: orgId,
+        actorId: userId,
+        action: 'room.delete',
+        entityType: 'room',
+        entityId: roomId,
+        ipAddress: clientInfo?.ip,
+        userAgent: clientInfo?.userAgent,
+        metadata: { name: room.name },
+      });
+
       return { message: 'Xóa phòng thành công' };
     } catch (err) {
       await queryRunner.rollbackTransaction();
@@ -354,6 +405,7 @@ export class RoomService {
     roomId: string,
     userId: string,
     dto: CreateMaintenanceBlockDto,
+    clientInfo?: IClientInfo,
   ) {
     const membership = await this.getMembership(orgId, userId);
     this.checkAdmin(membership, 'Bạn không có quyền tạo lịch bảo trì');
@@ -372,7 +424,20 @@ export class RoomService {
       reason,
     });
 
-    return this.maintenanceBlockRepository.save(block);
+    const savedBlock = await this.maintenanceBlockRepository.save(block);
+
+    await this.auditService.logAction({
+      organizationId: orgId,
+      actorId: userId,
+      action: 'room.maintenance_start',
+      entityType: 'room',
+      entityId: roomId,
+      ipAddress: clientInfo?.ip,
+      userAgent: clientInfo?.userAgent,
+      metadata: { timeRange: savedBlock.timeRange, reason },
+    });
+
+    return savedBlock;
   }
 
   async findAllMaintenanceBlocks(
@@ -389,7 +454,12 @@ export class RoomService {
     });
   }
 
-  async removeMaintenanceBlock(orgId: string, blockId: string, userId: string) {
+  async removeMaintenanceBlock(
+    orgId: string,
+    blockId: string,
+    userId: string,
+    clientInfo?: IClientInfo,
+  ) {
     const membership = await this.getMembership(orgId, userId);
     this.checkAdmin(membership, 'Bạn không có quyền xóa lịch bảo trì');
 
@@ -400,6 +470,18 @@ export class RoomService {
     if (!block) throw new BadRequestException('Block bảo trì không tồn tại');
 
     await this.maintenanceBlockRepository.delete(blockId);
+
+    await this.auditService.logAction({
+      organizationId: orgId,
+      actorId: userId,
+      action: 'room.maintenance_end',
+      entityType: 'room',
+      entityId: block.roomId,
+      ipAddress: clientInfo?.ip,
+      userAgent: clientInfo?.userAgent,
+      metadata: { blockId, reason: block.reason },
+    });
+
     return { message: 'Xóa lịch bảo trì thành công' };
   }
 }

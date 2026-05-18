@@ -26,7 +26,7 @@ export class OrganizationService {
     @InjectRepository(OrganizationInvitation)
     private readonly organizationInvitationRepository: Repository<OrganizationInvitation>,
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
 
   async create(createDto: CreateOrganizationDto, userId: string) {
     // Tạo đối tượng organization mới gắn với ownerId là người đang login
@@ -262,11 +262,11 @@ export class OrganizationService {
       joinedAt: member.joinedAt,
       user: member.user
         ? {
-            id: member.user.id,
-            fullName: member.user.fullName,
-            email: member.user.email,
-            timezone: member.user.timezone,
-          }
+          id: member.user.id,
+          fullName: member.user.fullName,
+          email: member.user.email,
+          timezone: member.user.timezone,
+        }
         : null,
     }));
   }
